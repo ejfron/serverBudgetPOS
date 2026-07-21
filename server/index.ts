@@ -40,26 +40,37 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() })
 })
 
-// ✅ Debug: Check if .output/public exists
+// ✅ Serve Nuxt static assets
 const nuxtDistPath = path.join(process.cwd(), '.output/public')
-console.log('📁 Nuxt dist path:', nuxtDistPath)
-console.log('📁 Exists:', fs.existsSync(nuxtDistPath))
-if (fs.existsSync(nuxtDistPath)) {
-  console.log('📁 Contents:', fs.readdirSync(nuxtDistPath))
-}
-
 app.use(express.static(nuxtDistPath))
 
-// ✅ Serve index.html for all non-API routes
-app.get('*', (req, res, next) => {
+// ✅ SPA fallback using middleware (not app.get('*'))
+app.use((req, res, next) => {
   if (req.path.startsWith('/api/')) return next()
+  
   const indexPath = path.join(nuxtDistPath, 'index.html')
-  console.log('📄 Serving:', indexPath, 'Exists:', fs.existsSync(indexPath))
   if (fs.existsSync(indexPath)) {
-    res.sendFile(indexPath)
-  } else {
-    res.status(404).send('Cannot GET ' + req.path + ' - index.html not found at ' + indexPath)
+    return res.sendFile(indexPath)
   }
+  
+  // If no index.html, serve 200.html (Nuxt SPA fallback)
+  const fallbackPath = path.join(nuxtDistPath, '200.html')
+  if (fs.existsSync(fallbackPath)) {
+    return res.sendFile(fallbackPath)
+  }
+  
+  // Last resort - serve a simple message
+  res.status(200).send(`
+    <!DOCTYPE html>
+    <html>
+    <head><title>Tapsilogan POS</title></head>
+    <body>
+      <h1>Tapsilogan POS Server</h1>
+      <p>API is running. Frontend not found.</p>
+      <p>Use the mobile APK to access the full app.</p>
+    </body>
+    </html>
+  `)
 })
 
 const server = http.createServer(app)
