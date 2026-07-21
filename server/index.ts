@@ -2,6 +2,7 @@ import express from 'express'
 import cors from 'cors'
 import http from 'http'
 import path from 'node:path'
+import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { runMigrations } from './db/migrations.js'
 import authRoutes from './routes/auth.js'
@@ -18,8 +19,6 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const app = express()
-
-// ✅ Render sets PORT env variable — use it first
 const PORT = parseInt(process.env.PORT || process.env.SERVER_PORT || '3001', 10)
 const HOST = '0.0.0.0'
 
@@ -41,14 +40,26 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() })
 })
 
+// ✅ Debug: Check if .output/public exists
 const nuxtDistPath = path.join(process.cwd(), '.output/public')
+console.log('📁 Nuxt dist path:', nuxtDistPath)
+console.log('📁 Exists:', fs.existsSync(nuxtDistPath))
+if (fs.existsSync(nuxtDistPath)) {
+  console.log('📁 Contents:', fs.readdirSync(nuxtDistPath))
+}
+
 app.use(express.static(nuxtDistPath))
 
-app.use((req, res, next) => {
+// ✅ Serve index.html for all non-API routes
+app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api/')) return next()
-  res.sendFile(path.join(nuxtDistPath, 'index.html'), (err) => {
-    if (err) next()
-  })
+  const indexPath = path.join(nuxtDistPath, 'index.html')
+  console.log('📄 Serving:', indexPath, 'Exists:', fs.existsSync(indexPath))
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath)
+  } else {
+    res.status(404).send('Cannot GET ' + req.path + ' - index.html not found at ' + indexPath)
+  }
 })
 
 const server = http.createServer(app)
