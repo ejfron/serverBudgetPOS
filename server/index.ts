@@ -18,16 +18,16 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const app = express()
-const PORT = parseInt(process.env.SERVER_PORT || '3001', 10)
-const HOST = process.env.HOST || '0.0.0.0'
+
+// ✅ Render sets PORT env variable — use it first
+const PORT = parseInt(process.env.PORT || process.env.SERVER_PORT || '3001', 10)
+const HOST = '0.0.0.0'
 
 app.use(cors())
 app.use(express.json())
 
-// Serve uploaded files
 app.use('/uploads', express.static(path.join(process.cwd(), 'public/uploads')))
 
-// API Routes
 app.use('/api/auth', authRoutes)
 app.use('/api/orders', orderRoutes)
 app.use('/api/menu-items', menuRoutes)
@@ -41,19 +41,13 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() })
 })
 
-// Serve Nuxt built frontend (must be AFTER API routes)
 const nuxtDistPath = path.join(process.cwd(), '.output/public')
 app.use(express.static(nuxtDistPath))
 
-// SPA fallback - serve index.html for all non-API routes
 app.use((req, res, next) => {
-  if (req.path.startsWith('/api/')) {
-    return next()
-  }
+  if (req.path.startsWith('/api/')) return next()
   res.sendFile(path.join(nuxtDistPath, 'index.html'), (err) => {
-    if (err) {
-      next()
-    }
+    if (err) next()
   })
 })
 
@@ -63,7 +57,7 @@ initWebSocket(server)
 runMigrations()
 
 server.listen(PORT, HOST, () => {
-  console.log(`✅ Tapsilogan POS server running on http://${HOST}:${PORT}`)
+  console.log(`✅ Server running on port ${PORT}`)
 })
 
 export default server
