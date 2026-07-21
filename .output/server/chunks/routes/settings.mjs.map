@@ -1,0 +1,1 @@
+{"version":3,"file":"settings.mjs","sources":["../../../../server/routes/settings.ts"],"names":[],"mappings":";;;;;;;;;;;;;;;;;AAGA,MAAM,SAAS,MAAA;AAEf,MAAA,CAAO,GAAA,CAAI,GAAA,EAAK,CAAC,IAAA,EAAM,GAAA,KAAQ;AAC7B,EAAA,MAAM,QAAA,GAAW,EAAA,CAAG,OAAA,CAAQ,qCAAqC,EAAE,GAAA,EAAI;AACvE,EAAA,OAAO,IAAI,IAAA,CAAK,QAAA,IAAA,IAAA,GAAA,QAAA,GAAY,EAAE,aAAA,EAAe,eAAe,CAAA;AAC9D,CAAC,CAAA;;;;"}
