@@ -6,10 +6,10 @@ import { hasKitchen } from '../../shared/types/business.types.js'
 
 const router = Router()
 
-// Returns branches with their cashier/kitchen usernames + password hashes joined in,
-// matching the shape admin/branches.vue expects.
-router.get('/', (_req, res) => {
-  const branches = db.prepare(`
+router.get('/', (req, res) => {
+  const { admin_branch_id } = req.query
+
+  let query = `
     SELECT
       b.id, b.name, b.address, b.business_type, b.created_at,
       cashier.username as cashierUsername,
@@ -19,16 +19,23 @@ router.get('/', (_req, res) => {
     FROM branches b
     LEFT JOIN users cashier ON cashier.branch_id = b.id AND cashier.role = 'front'
     LEFT JOIN users kitchen ON kitchen.branch_id = b.id AND kitchen.role = 'kitchen'
-    ORDER BY b.name
-  `).all()
+  `
+  const params: any[] = []
+
+  if (admin_branch_id) {
+    query += ` WHERE b.id = ? OR b.created_by_branch = ?`
+    params.push(admin_branch_id, admin_branch_id)
+  }
+
+  query += ` ORDER BY b.name`
+
+  const branches = db.prepare(query).all(...params)
 
   return res.json(branches)
 })
 
-// Bulk create branches, each with a cashier account and (if the business
-// type has a kitchen) a kitchen account too.
 router.post('/', (req, res) => {
-  const { branches } = req.body
+  const { branches, admin_branch_id } = req.body
 
   if (!Array.isArray(branches) || branches.length === 0) {
     return res.status(400).json({ success: false, message: 'No branches provided' })
@@ -36,8 +43,8 @@ router.post('/', (req, res) => {
 
   try {
     const insertBranch = db.prepare(`
-      INSERT INTO branches (id, name, address, business_type)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO branches (id, name, address, business_type, created_by_branch)
+      VALUES (?, ?, ?, ?, ?)
     `)
     const insertUser = db.prepare(`
       INSERT INTO users (id, username, password_hash, role, branch_id, full_name)
@@ -53,15 +60,30 @@ router.post('/', (req, res) => {
         const businessType = b.business_type || 'tapsilogan'
         const branchId = randomUUID()
 
-        insertBranch.run(branchId, b.name, b.location || null, businessType)
+        insertBranch.run(branchId, b.name, b.location || null, businessType, admin_branch_id || null)
 
         const cashierHash = bcrypt.hashSync(b.cashierPassword, 10)
-        insertUser.run(randomUUID(), b.cashierUsername, cashierHash, 'front', branchId, b.name)
+        let finalCashierUser = b.cashierUsername
+        let counter = 1
+        while (db.prepare('SELECT id FROM users WHERE username = ?').get(finalCashierUser)) {
+          finalCashierUser = `${b.cashierUsername}${counter}`
+          counter++
+        }
+        insertUser.run(randomUUID(), finalCashierUser, cashierHash, 'front', branchId, b.name)
 
-        // Only create a kitchen account if this business type actually has one
-        if (hasKitchen(businessType) && b.kitchenUsername && b.kitchenPassword) {
+        const createKitchen = b.has_kitchen !== undefined 
+          ? b.has_kitchen 
+          : hasKitchen(businessType)
+
+        if (createKitchen && b.kitchenUsername && b.kitchenPassword) {
+          let finalKitchenUser = b.kitchenUsername
+          let kCounter = 1
+          while (db.prepare('SELECT id FROM users WHERE username = ?').get(finalKitchenUser)) {
+            finalKitchenUser = `${b.kitchenUsername}${kCounter}`
+            kCounter++
+          }
           const kitchenHash = bcrypt.hashSync(b.kitchenPassword, 10)
-          insertUser.run(randomUUID(), b.kitchenUsername, kitchenHash, 'kitchen', branchId, b.name)
+          insertUser.run(randomUUID(), finalKitchenUser, kitchenHash, 'kitchen', branchId, b.name)
         }
       }
     })

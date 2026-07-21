@@ -1,0 +1,14 @@
+{
+  "extends": "./.nuxt/tsconfig.json",
+  "compilerOptions": {
+    "strict": false,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "paths": {
+      "@shared/*": ["./shared/*"],
+      "~/*": ["./app/*"],
+      "@/*": ["./app/*"],
+      "*": ["./*"]
+    }
+  }
+}

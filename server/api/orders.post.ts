@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid'
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
-  const { branch_id, created_by, items } = body
+  const { branch_id, created_by, items, payment_method } = body
 
   if (!branch_id || !created_by || !Array.isArray(items) || items.length === 0) {
     throw createError({ statusCode: 400, statusMessage: 'Missing required fields' })
@@ -17,10 +17,11 @@ export default defineEventHandler(async (event) => {
   const order_number = (lastOrder?.maxNum || 0) + 1
 
   const orderId = uuidv4()
+  const pm = payment_method || 'cash'
 
   const insertOrder = db.prepare(`
-    INSERT INTO orders (id, branch_id, order_number, created_by, total_amount, status)
-    VALUES (?, ?, ?, ?, ?, 'pending')
+    INSERT INTO orders (id, branch_id, order_number, created_by, total_amount, status, payment_method)
+    VALUES (?, ?, ?, ?, ?, 'pending', ?)
   `)
   const insertItem = db.prepare(`
     INSERT INTO order_items (id, order_id, menu_item_id, item_name, quantity, unit_price, subtotal)
@@ -28,7 +29,7 @@ export default defineEventHandler(async (event) => {
   `)
 
   const transaction = db.transaction(() => {
-    insertOrder.run(orderId, branch_id, order_number, created_by, total_amount)
+    insertOrder.run(orderId, branch_id, order_number, created_by, total_amount, pm)
     for (const item of items) {
       const subtotal = item.unit_price * item.quantity
       insertItem.run(uuidv4(), orderId, item.menu_item_id, item.name, item.quantity, item.unit_price, subtotal)

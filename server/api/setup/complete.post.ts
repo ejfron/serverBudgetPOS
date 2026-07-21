@@ -6,7 +6,6 @@ export default defineEventHandler(async (event) => {
   const body = await readBody(event)
   const { businessName, username, password } = body
 
-  // Validation
   if (!businessName || !username || !password) {
     throw createError({ statusCode: 400, statusMessage: 'All fields are required' })
   }
@@ -19,7 +18,6 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Username must be at least 3 characters' })
   }
 
-  // Check if username already exists
   const existingUser = db.prepare('SELECT id FROM users WHERE username = ?').get(username)
   if (existingUser) {
     throw createError({ 
@@ -32,10 +30,11 @@ export default defineEventHandler(async (event) => {
   const branchId = uuidv4()
   const userId = uuidv4()
 
-  // Use a transaction to ensure all inserts succeed or none do
   const createAccount = db.transaction(() => {
-    // Create the main branch
+    // ✅ Create branch without business_type (uses DB default)
     db.prepare('INSERT INTO branches (id, name) VALUES (?, ?)').run(branchId, businessName)
+    // ✅ Then set to empty to force setup page
+    db.prepare("UPDATE branches SET business_type = '' WHERE id = ?").run(branchId)
 
     // Create admin user
     db.prepare(`
@@ -43,7 +42,7 @@ export default defineEventHandler(async (event) => {
       VALUES (?, ?, ?, 'admin', ?, ?)
     `).run(userId, username, hash, branchId, username)
 
-    // Update settings - use INSERT OR REPLACE to handle both cases
+    // Update settings
     db.prepare(`
       INSERT INTO settings (id, business_name, updated_at) 
       VALUES (1, ?, datetime('now'))
@@ -61,7 +60,8 @@ export default defineEventHandler(async (event) => {
       username: username,
       role: 'admin',
       branch_id: branchId,
-      business_name: businessName,
+      branch_name: businessName,
+      business_type: '',              // ✅ Empty to force setup
       full_name: username
     }
 

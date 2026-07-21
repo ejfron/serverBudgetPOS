@@ -66,21 +66,48 @@ export function runMigrations() {
       CREATE INDEX IF NOT EXISTS idx_orders_branch_status ON orders(branch_id, status);
       CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
 
-      -- Insert default settings row if not exists
       INSERT OR IGNORE INTO settings (id, business_name) VALUES (1, 'My Business');
     `)
 
-    // ── Custom categories table ──────────────────────────────────────
+    // ── Custom categories table with business_type support ───────────
     db.exec(`
       CREATE TABLE IF NOT EXISTS categories (
         id TEXT PRIMARY KEY,
-        name TEXT UNIQUE NOT NULL,
-        created_at TEXT DEFAULT (datetime('now'))
+        name TEXT NOT NULL,
+        business_type TEXT NOT NULL DEFAULT 'tapsilogan',
+        created_at TEXT DEFAULT (datetime('now')),
+        UNIQUE(name, business_type)
       );
     `)
-    const seedCategories = db.prepare('INSERT OR IGNORE INTO categories (id, name) VALUES (?, ?)')
+
+    // ✅ Seed default categories per business type
+    const seedCategories = db.prepare(
+      'INSERT OR IGNORE INTO categories (id, name, business_type) VALUES (?, ?, ?)'
+    )
+
+    // Tapsilogan
     for (const name of ['Silog', 'Drinks', 'Extras']) {
-      seedCategories.run(name.toLowerCase(), name)
+      seedCategories.run(name.toLowerCase(), name, 'tapsilogan')
+    }
+
+    // Restaurant
+    for (const name of ['Rice', 'Ulam', 'Soup', 'Drinks', 'Extras']) {
+      seedCategories.run(`${name.toLowerCase()}_restaurant`, name, 'restaurant')
+    }
+
+    // Karinderya
+    for (const name of ['Rice', 'Ulam', 'Drinks', 'Extras']) {
+      seedCategories.run(`${name.toLowerCase()}_karinderya`, name, 'karinderya')
+    }
+
+    // Sari-Sari Store
+    for (const name of ['Dry Groceries', 'Condiments', 'Beverages', 'Snacks & Chichirya', 'Personal Care & Hygiene']) {
+      seedCategories.run(name.toLowerCase().replace(/[^a-z0-9]/g, '_'), name, 'sarisari')
+    }
+
+    // Fast Food
+    for (const name of ['Burgers', 'Fries', 'Drinks', 'Milktea', 'Tacos', 'Extras']) {
+      seedCategories.run(name.toLowerCase(), name, 'fastfood')
     }
 
     // ── Remove the CHECK constraint on menu_items.category ───────────
@@ -92,10 +119,8 @@ export function runMigrations() {
 
     if (hasOldCategoryConstraint) {
       db.pragma('foreign_keys = OFF')
-
       db.exec(`
         BEGIN TRANSACTION;
-
         CREATE TABLE menu_items_new (
           id TEXT PRIMARY KEY,
           name TEXT NOT NULL,
@@ -105,41 +130,89 @@ export function runMigrations() {
           is_available INTEGER NOT NULL DEFAULT 1,
           created_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
-
         INSERT INTO menu_items_new (id, name, category, price, is_available, created_at)
         SELECT id, name, category, price, is_available, created_at FROM menu_items;
-
         DROP TABLE menu_items;
         ALTER TABLE menu_items_new RENAME TO menu_items;
-
         COMMIT;
       `)
-
       db.pragma('foreign_keys = ON')
-
-      console.log('✅ menu_items category constraint removed, custom categories now allowed')
+      console.log('✅ menu_items category constraint removed')
     } else {
       try {
         db.exec(`ALTER TABLE menu_items ADD COLUMN image_url TEXT`)
-      } catch {
-        // column already exists — safe to ignore
-      }
+      } catch {}
     }
 
-    // ── business_type support (tapsilogan | restaurant | karinderya | sarisari) ──
+    // ── business_type support ──
     const branchInfo = db.prepare(`
       SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'branches'
     `).get() as { sql: string } | undefined
 
     const hasBusinessType = branchInfo?.sql.includes('business_type')
-
     if (!hasBusinessType) {
       try {
         db.exec(`ALTER TABLE branches ADD COLUMN business_type TEXT NOT NULL DEFAULT 'tapsilogan'`)
         console.log('✅ business_type column added to branches')
-      } catch {
-        // already exists — safe to ignore
-      }
+      } catch {}
+    }
+
+    // ── created_by_branch support ────────────────────────────────────
+    const hasCreatedByBranch = branchInfo?.sql.includes('created_by_branch')
+    if (!hasCreatedByBranch) {
+      try {
+        db.exec(`ALTER TABLE branches ADD COLUMN created_by_branch TEXT`)
+        console.log('✅ created_by_branch column added to branches')
+      } catch {}
+    }
+
+    db.exec(`
+      UPDATE branches 
+      SET created_by_branch = id 
+      WHERE created_by_branch IS NULL 
+      AND id IN (SELECT branch_id FROM users WHERE role = 'admin')
+    `)
+
+    // ── payment_method support ───────────────────────────────────────
+    const orderInfo = db.prepare(`
+      SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'orders'
+    `).get() as { sql: string } | undefined
+
+    const hasPaymentMethod = orderInfo?.sql.includes('payment_method')
+    if (!hasPaymentMethod) {
+      try {
+        db.exec(`ALTER TABLE orders ADD COLUMN payment_method TEXT NOT NULL DEFAULT 'cash'`)
+        console.log('✅ payment_method column added to orders')
+      } catch {}
+    }
+
+    // ── Update status CHECK constraint ──
+    const hasOldStatusCheck = orderInfo?.sql.includes("CHECK(status IN ('pending', 'ready', 'completed'))")
+    if (hasOldStatusCheck) {
+      db.pragma('foreign_keys = OFF')
+      db.exec(`
+        BEGIN TRANSACTION;
+        CREATE TABLE orders_new (
+          id TEXT PRIMARY KEY,
+          branch_id TEXT NOT NULL REFERENCES branches(id),
+          status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'ongoing', 'ready', 'completed', 'voided')),
+          order_number INTEGER NOT NULL,
+          created_by TEXT NOT NULL REFERENCES users(id),
+          total_amount REAL NOT NULL DEFAULT 0,
+          payment_method TEXT NOT NULL DEFAULT 'cash',
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          ready_at TEXT,
+          completed_at TEXT
+        );
+        INSERT INTO orders_new (id, branch_id, status, order_number, created_by, total_amount, payment_method, created_at, ready_at, completed_at)
+        SELECT id, branch_id, status, order_number, created_by, total_amount, COALESCE(payment_method, 'cash'), created_at, ready_at, completed_at FROM orders;
+        DROP TABLE orders;
+        ALTER TABLE orders_new RENAME TO orders;
+        CREATE INDEX IF NOT EXISTS idx_orders_branch_status ON orders(branch_id, status);
+        COMMIT;
+      `)
+      db.pragma('foreign_keys = ON')
+      console.log('✅ orders status constraint updated (added ongoing, voided)')
     }
 
     console.log('✅ Database migrations complete')

@@ -4,15 +4,21 @@
   "main": "dist-electron/main.js",
   "private": true,
   "scripts": {
-    "build": "nuxt build",
     "dev": "nuxt dev",
+    "build": "nuxt build",
+    "start": "node server/index.js",
+    "render:start": "node server/index.js",
+    "pm2:start": "pm2 start ecosystem.config.cjs",
+    "pm2:stop": "pm2 stop tapsilogan-pos",
+    "pm2:restart": "pm2 restart tapsilogan-pos",
+    "pm2:status": "pm2 status",
+    "pm2:logs": "pm2 logs tapsilogan-pos",
     "generate": "nuxt generate",
-    "preview": "nuxt preview",
-    "postinstall": "nuxt prepare",
-    "server:dev": "tsx server/index.ts",
-    "electron:dev": "concurrently \"npm run dev\" \"npm run server:dev\" \"wait-on http://localhost:3000 && electron .\"",
-    "electron:rebuild": "electron-rebuild -f -w better-sqlite3,serialport,bcrypt",
-    "rebuild": "npm run electron:rebuild"
+    "android:sync": "npx cap sync android",
+    "android:open": "npx cap open android"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "dependencies": {
     "@awesome-cordova-plugins/bluetooth-serial": "^9.2.0",
@@ -76,7 +82,7 @@
     "nuxt-electron": "^0.7.0",
     "ts-node": "^10.9.2",
     "tsup": "^8.5.1",
-    "tsx": "^4.23.0",
+    "tsx": "^4.23.1",
     "vite-plugin-electron": "^1.1.0",
     "wait-on": "^9.0.10"
   }

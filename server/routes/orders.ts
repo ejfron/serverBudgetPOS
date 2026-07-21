@@ -18,7 +18,7 @@ router.get('/', (req, res) => {
 })
 
 router.post('/', (req, res) => {
-  const { branch_id, created_by, cart, items } = req.body
+  const { branch_id, created_by, cart, items, payment_method } = req.body  // ✅ Added payment_method
   const orderItems = Array.isArray(cart) ? cart : Array.isArray(items) ? items : []
   if (!branch_id || !created_by || !orderItems?.length) return res.status(400).json({ success: false, message: 'Missing fields' })
   const total = orderItems.reduce((s: number, i: any) => s + i.unit_price * i.quantity, 0)
@@ -27,9 +27,11 @@ router.post('/', (req, res) => {
   const orderId = uuidv4()
   const now = new Date().toISOString()
   db.transaction(() => {
-    db.prepare('INSERT INTO orders (id, branch_id, status, order_number, created_by, total_amount, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(orderId, branch_id, 'pending', orderNumber, created_by, total, now)
+    db.prepare('INSERT INTO orders (id, branch_id, status, order_number, created_by, total_amount, created_at, payment_method) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')  // ✅ Added payment_method
+      .run(orderId, branch_id, 'pending', orderNumber, created_by, total, now, payment_method || 'cash')  // ✅ Added
     for (const item of orderItems) {
-      db.prepare('INSERT INTO order_items (id, order_id, menu_item_id, item_name, quantity, unit_price, subtotal) VALUES (?, ?, ?, ?, ?, ?, ?)').run(uuidv4(), orderId, item.menu_item_id, item.name, item.quantity, item.unit_price, item.unit_price * item.quantity)
+      db.prepare('INSERT INTO order_items (id, order_id, menu_item_id, item_name, quantity, unit_price, subtotal) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .run(uuidv4(), orderId, item.menu_item_id, item.name, item.quantity, item.unit_price, item.unit_price * item.quantity)
     }
   })()
   const full = db.prepare(`SELECT o.*, json_group_array(json_object('id', oi.id, 'order_id', oi.order_id, 'menu_item_id', oi.menu_item_id, 'item_name', oi.item_name, 'quantity', oi.quantity, 'unit_price', oi.unit_price, 'subtotal', oi.subtotal)) as order_items FROM orders o LEFT JOIN order_items oi ON o.id = oi.order_id WHERE o.id = ? GROUP BY o.id`).get(orderId) as any
@@ -38,17 +40,59 @@ router.post('/', (req, res) => {
   return res.status(201).json({ success: true, data: result })
 })
 
+// ✅ Updated PATCH to handle void, edit, and payment_method
 router.patch('/:id', (req, res) => {
   const { id } = req.params
-  const { status } = req.body
-  if (!['ready', 'completed'].includes(status)) return res.status(400).json({ success: false, message: 'Invalid status' })
+  const { status, payment_method, order_items, total_amount } = req.body
   const now = new Date().toISOString()
-  if (status === 'ready') db.prepare(`UPDATE orders SET status = 'ready', ready_at = ? WHERE id = ?`).run(now, id)
-  else db.prepare(`UPDATE orders SET status = 'completed', completed_at = ? WHERE id = ?`).run(now, id)
+
+  if (status) {
+    // Status update (ready, completed, voided, ongoing)
+    if (status === 'ready') {
+      db.prepare(`UPDATE orders SET status = 'ready', ready_at = ? WHERE id = ?`).run(now, id)
+    } else if (status === 'completed') {
+      db.prepare(`UPDATE orders SET status = 'completed', completed_at = ? WHERE id = ?`).run(now, id)
+    } else if (status === 'voided' || status === 'ongoing' || status === 'pending') {
+      db.prepare(`UPDATE orders SET status = ? WHERE id = ?`).run(status, id)
+    }
+  }
+
+  // ✅ Handle order items update (for edit)
+  if (order_items && total_amount) {
+    // Delete existing items
+    db.prepare('DELETE FROM order_items WHERE order_id = ?').run(id)
+    // Insert new items
+    for (const item of order_items) {
+      db.prepare('INSERT INTO order_items (id, order_id, menu_item_id, item_name, quantity, unit_price, subtotal) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .run(uuidv4(), id, item.menu_item_id || null, item.item_name, item.quantity, item.unit_price, item.subtotal || item.quantity * item.unit_price)
+    }
+    // Update total and payment method
+    if (payment_method) {
+      db.prepare('UPDATE orders SET total_amount = ?, payment_method = ? WHERE id = ?').run(total_amount, payment_method, id)
+    } else {
+      db.prepare('UPDATE orders SET total_amount = ? WHERE id = ?').run(total_amount, id)
+    }
+  }
+
+  // ✅ Handle just payment_method update
+  if (payment_method && !order_items) {
+    db.prepare('UPDATE orders SET payment_method = ? WHERE id = ?').run(payment_method, id)
+  }
+
   const updated = db.prepare(`SELECT o.*, json_group_array(json_object('id', oi.id, 'order_id', oi.order_id, 'menu_item_id', oi.menu_item_id, 'item_name', oi.item_name, 'quantity', oi.quantity, 'unit_price', oi.unit_price, 'subtotal', oi.subtotal)) as order_items FROM orders o LEFT JOIN order_items oi ON o.id = oi.order_id WHERE o.id = ? GROUP BY o.id`).get(id) as any
   const result = { ...updated, order_items: JSON.parse(updated.order_items).filter((i: any) => i.id !== null) }
   broadcast(result.branch_id, { type: 'ORDER_UPDATED', order: result })
   return res.json({ success: true, data: result })
+})
+
+
+router.delete('/:id', (req, res) => {
+  const { id } = req.params
+  db.transaction(() => {
+    db.prepare('DELETE FROM order_items WHERE order_id = ?').run(id)
+    db.prepare('DELETE FROM orders WHERE id = ?').run(id)
+  })()
+  return res.json({ success: true, message: 'Order deleted' })
 })
 
 export default router

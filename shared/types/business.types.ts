@@ -1,8 +1,9 @@
-export type BusinessType = 'tapsilogan' | 'restaurant' | 'karinderya' | 'sarisari'
+export type BusinessType = 'tapsilogan' | 'restaurant' | 'karinderya' | 'sarisari' | 'fastfood'
 
 export const BUSINESS_TYPES: { value: BusinessType; label: string; hasKitchen: boolean }[] = [
   { value: 'tapsilogan', label: 'Tapsilogan', hasKitchen: true },
   { value: 'restaurant', label: 'Restaurant', hasKitchen: true },
+  { value: 'fastfood', label: 'Fastfood', hasKitchen: true },
   { value: 'karinderya', label: 'Karinderya', hasKitchen: false },
   { value: 'sarisari', label: 'Sari-Sari Store', hasKitchen: false },
 ]
