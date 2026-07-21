@@ -1,0 +1,13 @@
+{
+  "appId": "com.tapsilogan.pos",
+  "appName": "Tapsilogan POS",
+  "webDir": ".output/public",
+  "server": {
+    "url": "https://tapsilogan-pos.onrender.com",
+    "cleartext": false,
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": true
+  }
+}

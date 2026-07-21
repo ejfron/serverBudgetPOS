@@ -2,8 +2,16 @@ import { execSync } from 'node:child_process'
 import { resolve } from 'path'
 
 const getLanServerUrl = (): string => {
+  // Use environment variable if set (for Render/production)
   const envUrl = process.env.SERVER_URL || process.env.CAPACITOR_SERVER_URL
   if (envUrl) return envUrl
+  
+  // In production (Render), use the deployed URL
+  if (process.env.NODE_ENV === 'production' || process.env.RENDER) {
+    return 'https://tapsilogan-pos.onrender.com'
+  }
+  
+  // Local development - get LAN IP
   try {
     const ifaceIp = execSync('ipconfig getifaddr en0', { encoding: 'utf8' }).trim()
     if (ifaceIp) return `http://${ifaceIp}:3001`
@@ -12,8 +20,16 @@ const getLanServerUrl = (): string => {
 }
 
 const getLanSocketUrl = (): string => {
+  // Use environment variable if set
   const envUrl = process.env.SOCKET_URL
   if (envUrl) return envUrl
+  
+  // In production (Render), use WSS
+  if (process.env.NODE_ENV === 'production' || process.env.RENDER) {
+    return 'wss://tapsilogan-pos.onrender.com'
+  }
+  
+  // Local development
   try {
     const ifaceIp = execSync('ipconfig getifaddr en0', { encoding: 'utf8' }).trim()
     if (ifaceIp) return `ws://${ifaceIp}:3001`
