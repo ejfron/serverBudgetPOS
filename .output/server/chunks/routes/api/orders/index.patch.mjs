@@ -1,4 +1,4 @@
-import { d as defineEventHandler, b as getRouterParam, r as readBody, a as db } from '../../../nitro/nitro.mjs';
+import { d as defineEventHandler, e as getRouterParam, r as readBody, a as db } from '../../../nitro/nitro.mjs';
 import { randomUUID } from 'node:crypto';
 import 'node:http';
 import 'node:https';

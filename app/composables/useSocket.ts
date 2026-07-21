@@ -1,4 +1,3 @@
-// app/composables/useSocket.ts
 type SocketMessage =
   | { type: 'ORDER_CREATED'; order: any }
   | { type: 'ORDER_UPDATED'; order: any }
@@ -12,27 +11,22 @@ export function useSocket() {
   let ws: WebSocket | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
   let reconnectAttempts = 0
-  const MAX_RECONNECT = 3
+  const MAX_RECONNECT = 2
   const handlers: MessageHandler[] = []
   const connected = ref(false)
 
   function getWsUrl(branchId: string): string {
     const configured = config.public.serverUrl
-
     const wsBase = configured
       ? configured.replace(/^http/, 'ws')
       : `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`
-
     return `${wsBase}/_ws?branch_id=${branchId}`
   }
 
   function connect(branchId: string) {
     if (!import.meta.client) return
     if (ws?.readyState === WebSocket.OPEN) return
-    if (reconnectAttempts >= MAX_RECONNECT) {
-      console.log('WebSocket max reconnect attempts reached, stopping')
-      return
-    }
+    if (reconnectAttempts >= MAX_RECONNECT) return
 
     const url = getWsUrl(branchId)
     ws = new WebSocket(url)
@@ -40,7 +34,6 @@ export function useSocket() {
     ws.onopen = () => {
       connected.value = true
       reconnectAttempts = 0
-      console.log('🔌 WebSocket connected')
       if (reconnectTimer) clearTimeout(reconnectTimer)
     }
 
@@ -57,16 +50,11 @@ export function useSocket() {
       connected.value = false
       reconnectAttempts++
       if (reconnectAttempts < MAX_RECONNECT) {
-        console.log(`WebSocket reconnect ${reconnectAttempts}/${MAX_RECONNECT}`)
         reconnectTimer = setTimeout(() => connect(branchId), 5000)
-      } else {
-        console.log('WebSocket disconnected — max retries reached')
       }
     }
 
-    ws.onerror = () => {
-      // Error handled by onclose
-    }
+    ws.onerror = () => {}
   }
 
   function disconnect() {

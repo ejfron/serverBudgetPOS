@@ -1,4 +1,4 @@
-import { d as defineEventHandler, b as getRouterParam, a as db } from '../../../nitro/nitro.mjs';
+import { d as defineEventHandler, e as getRouterParam, a as db } from '../../../nitro/nitro.mjs';
 import 'node:http';
 import 'node:https';
 import 'node:events';
