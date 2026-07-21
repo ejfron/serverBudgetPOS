@@ -57,14 +57,14 @@ setTimeout(async () => {
 
 }
 
-onMounted(async () => {
-  try {
-    const { needsSetup } = await $fetch<{ needsSetup: boolean }>(`${serverUrl.value}/api/setup/status`)
-    if (needsSetup) {
-      await navigateTo('/signup')
-    }
-  } catch (_) {}
-})
+// onMounted(async () => {
+//   try {
+//     const { needsSetup } = await $fetch<{ needsSetup: boolean }>(`${serverUrl.value}/api/setup/status`)
+//     if (needsSetup) {
+//       await navigateTo('/signup')
+//     }
+//   } catch (_) {}
+// })
 </script>
 
 <template>
