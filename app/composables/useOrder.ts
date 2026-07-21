@@ -23,16 +23,15 @@ export function useOrder() {
     }
   }
 
-  // ✅ Updated: Added paymentMethod parameter
   async function placeOrder(
     branchId: string,
     createdBy: string,
     cart: CartLine[],
     branchName: string,
-    paymentMethod: string = 'cash',  // ✅ NEW
+    paymentMethod: string = 'cash', 
   ): Promise<Order | null> {
     try {
-      const res = await $fetch<{ success: boolean; data: Order }>(
+      const res = await $fetch<{ success: boolean; data?: Order; order?: Order }>(
         `${base}/api/orders`,
         {
           method: 'POST' as const,
@@ -40,14 +39,14 @@ export function useOrder() {
             branch_id: branchId,
             created_by: createdBy,
             items: cart,
-            payment_method: paymentMethod,  // ✅ NEW
+            payment_method: paymentMethod,  
           },
         },
       )
-      const order = res.data ?? null
+      // ✅ Handle both response formats (data.order or order)
+      const order = res.data || res.order || null
 
       if (order) {
-        // ✅ Attach payment method to order object for printing
         const orderForPrint = { ...order, payment_method: paymentMethod }
         
         printing.value = true

@@ -1,25 +1,32 @@
 <script setup lang="ts">
-
 import { hasKitchen } from '@shared/types/business.types'
 import type { BusinessTheme } from '~/utils/businessTheme'
+
 const { user } = useAuth()
 const branchHasKitchen = computed(() => hasKitchen(user.value?.business_type))
+
 import {
   Printer, Wifi, LogOut, Clock, Loader2,
   X, BluetoothSearching, CheckCircle2, RefreshCw, Send, Settings,
   Receipt, ChefHat,
 } from '@lucide/vue'
 
-defineProps<{
-  role: 'front' | 'kitchen'
-  branchName: string
+const props = defineProps<{
+  role: 'front' | 'kitchen' | 'admin'
+  branchName?: string
+  printerConnected?: boolean
+  printerConnecting?: boolean
   theme?: BusinessTheme
 }>()
 
-defineEmits<{ logout: [] }>()
+defineEmits<{
+  logout: []
+  connectPrinter: []
+  toggleSidebar: []
+}>()
 
 const {
-  connected: printerConnected,
+  connected: printerConnectedLocal,
   connectedDevice,
   scanning,
   pairedDevices,
@@ -37,6 +44,15 @@ const showModal = ref(false)
 const connecting = ref(false)
 const connectingId = ref<string | null>(null)
 const testing = ref(false)
+
+const printerConnected = computed(() => props.printerConnected ?? printerConnectedLocal.value)
+
+const displayBranchName = computed(() => props.branchName || user.value?.branch_name || 'Branch')
+const displayRole = computed(() => user.value?.role || props.role)
+const displayBusinessType = computed(() => {
+  const bt = user.value?.business_type || 'tapsilogan'
+  return bt.charAt(0).toUpperCase() + bt.slice(1)
+})
 
 function updateTime() {
   const now = new Date()
@@ -83,7 +99,6 @@ function deviceIcon(device: any): string {
   const name = (device.name ?? '').toLowerCase()
   if (name.includes('printer') || name.includes('pos') || name.includes('xp-') || name.includes('bt-') || name.includes('mtp')) return '🖨️'
   if (name.includes('samsung') || name.includes('iphone') || name.includes('android')) return '📱'
-  if (name.includes('buds') || name.includes('airpod') || name.includes('earbuds')) return '🎧'
   return '📡'
 }
 </script>
@@ -92,6 +107,11 @@ function deviceIcon(device: any): string {
   <header class="bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between shrink-0 shadow-sm">
 
     <div class="flex items-center gap-2.5">
+      <button @click="$emit('toggleSidebar')" class="lg:hidden p-1 rounded-lg text-gray-500 hover:bg-gray-100 mr-1">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+      </button>
       <div
         class="w-9 h-9 rounded-xl flex items-center justify-center shadow-md text-white"
         :class="theme?.solidBg ?? 'bg-orange-500'"
@@ -101,10 +121,10 @@ function deviceIcon(device: any): string {
       </div>
       <div>
         <p class="font-bold text-gray-800 text-sm leading-tight">
-          <span class="text-orange-500">Tapsi</span>logan POS
+          <span class="text-orange-500">{{ displayBusinessType }}</span> POS
         </p>
         <p class="text-xs text-gray-400">
-          {{ branchName }} · <span class="capitalize font-medium text-gray-500">{{ role }}</span>
+          {{ displayBranchName }} · <span class="capitalize font-medium text-gray-500">{{ displayRole }}</span>
         </p>
       </div>
     </div>
@@ -162,6 +182,7 @@ function deviceIcon(device: any): string {
     </div>
   </header>
 
+  <!-- Printer Modal -->
   <Teleport to="body">
     <Transition
       enter-active-class="transition duration-200 ease-out"
@@ -177,7 +198,6 @@ function deviceIcon(device: any): string {
         @click.self="showModal = false"
       >
         <div class="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
-
           <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
             <div class="flex items-center gap-2">
               <BluetoothSearching class="w-5 h-5 text-blue-500" />
@@ -200,7 +220,6 @@ function deviceIcon(device: any): string {
           </div>
 
           <div v-else class="p-4 space-y-3">
-
             <div v-if="successMsg" class="bg-green-50 border border-green-200 rounded-xl p-3 flex items-center gap-2">
               <CheckCircle2 class="w-4 h-4 text-green-500 shrink-0" />
               <p class="text-xs text-green-700 font-medium">{{ successMsg }}</p>
