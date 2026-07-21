@@ -1,3 +1,4 @@
+// app/composables/useSocket.ts
 type SocketMessage =
   | { type: 'ORDER_CREATED'; order: any }
   | { type: 'ORDER_UPDATED'; order: any }
@@ -10,6 +11,8 @@ export function useSocket() {
 
   let ws: WebSocket | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  let reconnectAttempts = 0
+  const MAX_RECONNECT = 3
   const handlers: MessageHandler[] = []
   const connected = ref(false)
 
@@ -26,12 +29,17 @@ export function useSocket() {
   function connect(branchId: string) {
     if (!import.meta.client) return
     if (ws?.readyState === WebSocket.OPEN) return
+    if (reconnectAttempts >= MAX_RECONNECT) {
+      console.log('WebSocket max reconnect attempts reached, stopping')
+      return
+    }
 
     const url = getWsUrl(branchId)
     ws = new WebSocket(url)
 
     ws.onopen = () => {
       connected.value = true
+      reconnectAttempts = 0
       console.log('🔌 WebSocket connected')
       if (reconnectTimer) clearTimeout(reconnectTimer)
     }
@@ -47,13 +55,22 @@ export function useSocket() {
 
     ws.onclose = () => {
       connected.value = false
-      reconnectTimer = setTimeout(() => connect(branchId), 3000)
+      reconnectAttempts++
+      if (reconnectAttempts < MAX_RECONNECT) {
+        console.log(`WebSocket reconnect ${reconnectAttempts}/${MAX_RECONNECT}`)
+        reconnectTimer = setTimeout(() => connect(branchId), 5000)
+      } else {
+        console.log('WebSocket disconnected — max retries reached')
+      }
     }
 
-    ws.onerror = (err) => console.error('WebSocket error:', err)
+    ws.onerror = () => {
+      // Error handled by onclose
+    }
   }
 
   function disconnect() {
+    reconnectAttempts = MAX_RECONNECT
     if (reconnectTimer) clearTimeout(reconnectTimer)
     ws?.close()
     ws = null
