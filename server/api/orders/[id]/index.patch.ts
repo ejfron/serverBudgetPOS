@@ -1,5 +1,5 @@
 // @ts-nocheck
-import db from '../../../../db/connection'
+import db from '../../../db/connection'
 import { randomUUID } from 'node:crypto'
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id'); const body = await readBody(event)

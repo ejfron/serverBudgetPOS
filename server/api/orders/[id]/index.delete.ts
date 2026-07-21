@@ -1,5 +1,5 @@
 // @ts-nocheck
-import db from '../../../../db/connection'
+import db from '../../../db/connection'
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
   db.prepare('DELETE FROM order_items WHERE order_id = ?').run(id)
