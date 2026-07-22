@@ -27,6 +27,7 @@
     "@capacitor/cli": "^8.4.1",
     "@capacitor/core": "^8.4.1",
     "@capacitor/ios": "^8.4.1",
+    "@libsql/client": "^0.17.4",
     "@lucide/vue": "^1.23.0",
     "@nuxt/image": "^2.0.0",
     "@nuxt/ui": "^4.9.0",

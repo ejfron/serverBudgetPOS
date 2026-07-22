@@ -23,15 +23,27 @@ const { serverUrl } = useServerConfig()
 
 const menuItems = ref<MenuItem[]>([])
 const existingItems = ref<MenuItem[]>([])
+const categories = ref<{ id: string; name: string }[]>([])
 const loading = ref(false)
 const loadingExisting = ref(false)
 const error = ref('')
 const successMsg = ref('')
 
+async function loadCategories() {
+  try {
+    const res = await $fetch<{ id: string; name: string }[]>(
+      `${serverUrl.value}/api/categories?business_type=${currentType.value}`
+    )
+    categories.value = res ?? []
+  } catch (e) {
+    console.error('loadCategories error:', e)
+  }
+}
+
 function addItem() {
   menuItems.value.push({
     name: '',
-    category: 'silog',
+    category: categories.value[0]?.name.toLowerCase() || 'silog',
     price: 0,
     business_type: currentType.value,
   })
@@ -79,14 +91,17 @@ function categoryLabel(cat: string) {
   return cat.charAt(0).toUpperCase() + cat.slice(1)
 }
 
-onMounted(() => loadExistingItems())
+onMounted(() => {
+  loadCategories()
+  loadExistingItems()
+})
 </script>
 
 <template>
   <div class="space-y-6">
     <div>
       <h1 class="text-2xl font-bold text-gray-800">Menu Items</h1>
-      <p class="text-gray-600 mt-1">Add or edit products for your branches.</p>
+      <p class="text-gray-600 mt-1">Add or edit products for {{ businessLabel(currentType) }}.</p>
     </div>
 
     <div v-for="(item, i) in menuItems" :key="i" class="bg-white rounded-xl p-5 shadow-sm border border-gray-100 space-y-3">
@@ -105,9 +120,7 @@ onMounted(() => loadExistingItems())
         <div>
           <label class="text-sm text-gray-600">Category</label>
           <select v-model="item.category" class="w-full rounded-xl border-gray-200 bg-white shadow-sm text-gray-700 mt-1 p-2">
-            <option value="silog">Silog</option>
-            <option value="drinks">Drinks</option>
-            <option value="extras">Extras</option>
+            <option v-for="cat in categories" :key="cat.id" :value="cat.name.toLowerCase()">{{ cat.name }}</option>
           </select>
         </div>
         <div>
@@ -149,20 +162,10 @@ onMounted(() => loadExistingItems())
         </button>
       </div>
 
-      <div v-if="loadingExisting" class="text-center py-8 text-gray-400 text-sm">
-        Loading products...
-      </div>
-
-      <div v-else-if="!existingItems.length" class="text-center py-8 text-gray-400 text-sm">
-        No products yet.
-      </div>
-
+      <div v-if="loadingExisting" class="text-center py-8 text-gray-400 text-sm">Loading products...</div>
+      <div v-else-if="!existingItems.length" class="text-center py-8 text-gray-400 text-sm">No products yet.</div>
       <div v-else class="divide-y divide-gray-50">
-        <div
-          v-for="(saved, i) in existingItems"
-          :key="saved.id ?? i"
-          class="flex items-center justify-between px-5 py-3"
-        >
+        <div v-for="(saved, i) in existingItems" :key="saved.id ?? i" class="flex items-center justify-between px-5 py-3">
           <div>
             <p class="text-sm font-medium text-gray-800">{{ saved.name }}</p>
             <p class="text-xs text-gray-400">{{ categoryLabel(saved.category) }}</p>
