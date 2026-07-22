@@ -12,6 +12,7 @@ const router = useRouter()
 const typeIcons: Record<BusinessType, any> = {
   tapsilogan: Utensils,
   restaurant: ChefHat,
+  fastfood: Pizza,
   karinderya: CookingPot,
   sarisari: ShoppingBasket,
 }

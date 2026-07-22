@@ -29,9 +29,10 @@ export function useOrder() {
     cart: CartLine[],
     branchName: string,
     paymentMethod: string = 'cash', 
+    orderType: string = 'dine-in',
   ): Promise<Order | null> {
     try {
-      const res = await $fetch<{ success: boolean; data?: Order; order?: Order }>(
+      const res = await $fetch<{ success: boolean; data: Order }>(
         `${base}/api/orders`,
         {
           method: 'POST' as const,
@@ -40,13 +41,14 @@ export function useOrder() {
             created_by: createdBy,
             items: cart,
             payment_method: paymentMethod,  
+            order_type: orderType, 
           },
         },
       )
-      // ✅ Handle both response formats (data.order or order)
-      const order = res.data || res.order || null
+      const order = res.data ?? null
 
       if (order) {
+        // ✅ Attach payment method to order object for printing
         const orderForPrint = { ...order, payment_method: paymentMethod }
         
         printing.value = true

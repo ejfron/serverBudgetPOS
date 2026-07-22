@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ShoppingCart, Minus, Plus, Trash2, Receipt, Banknote, CreditCard, Loader2, Printer, AlertTriangle } from '@lucide/vue'
+import { ShoppingCart, Minus, Plus, Trash2, Receipt, Banknote, CreditCard, Loader2, Printer, AlertTriangle, UtensilsCrossed, Package } from '@lucide/vue'
+import { hasKitchen } from '@shared/types/business.types'
 
 const props = defineProps<{
   cart?: any[]
@@ -12,11 +13,12 @@ const emit = defineEmits<{
   increment: [id: string]
   decrement: [id: string]
   clear: []
-  submit: [paymentMethod: string]
+  submit: [paymentMethod: string, orderType: string]
 }>()
 
 const { cart: sharedCart, orderNumber: sharedOrderNumber, loading: sharedLoading, incrementCart, decrementCart, clearCart } = useFrontOrder()
 const { connected: printerConnected, isNative } = usePrinter()
+const { user } = useAuth()
 
 const cartItems = computed(() => props.cart ?? sharedCart.value)
 const orderNumber = computed(() => props.orderNumber ?? sharedOrderNumber.value)
@@ -24,6 +26,13 @@ const loading = computed(() => props.loading ?? sharedLoading.value)
 const total = computed(() => cartItems.value.reduce((sum: number, l: any) => sum + l.unit_price * l.quantity, 0))
 
 const paymentMethod = ref<'cash' | 'gcash'>('cash')
+const orderType = ref<'dine-in' | 'take-out'>('dine-in')
+
+// ✅ Show dine-in/take-out only for business types that have kitchen
+const showOrderType = computed(() => {
+  const bt = user.value?.business_type
+  return bt === 'tapsilogan' || bt === 'restaurant' || bt === 'fastfood'
+})
 
 const showPrinterWarning = computed(() => isNative() && !printerConnected.value)
 
@@ -35,7 +44,7 @@ const buttonLabel = computed(() => {
 const isBusy = computed(() => loading.value || props.printing)
 
 function handleSubmit() {
-  emit('submit', paymentMethod.value)
+  emit('submit', paymentMethod.value, orderType.value)
 }
 </script>
 
@@ -117,7 +126,31 @@ function handleSubmit() {
         </div>
       </div>
 
-      <!-- Payment Method - Orange theme, both clickable -->
+      <!-- ✅ Dine In / Take Out (only for tapsilogan, restaurant, fastfood) -->
+      <div v-if="showOrderType" class="flex gap-2 mb-3">
+        <button
+          class="flex-1 rounded-xl py-2.5 flex flex-col items-center gap-1 transition-all border-2"
+          :class="orderType === 'dine-in'
+            ? 'border-amber-400 bg-amber-50'
+            : 'border-gray-200 bg-white'"
+          @click="orderType = 'dine-in'"
+        >
+          <UtensilsCrossed class="w-4 h-4" :class="orderType === 'dine-in' ? 'text-amber-600' : 'text-gray-400'" />
+          <span class="text-xs font-semibold" :class="orderType === 'dine-in' ? 'text-amber-600' : 'text-gray-400'">Dine In</span>
+        </button>
+        <button
+          class="flex-1 rounded-xl py-2.5 flex flex-col items-center gap-1 transition-all border-2"
+          :class="orderType === 'take-out'
+            ? 'border-blue-400 bg-blue-50'
+            : 'border-gray-200 bg-white'"
+          @click="orderType = 'take-out'"
+        >
+          <Package class="w-4 h-4" :class="orderType === 'take-out' ? 'text-blue-600' : 'text-gray-400'" />
+          <span class="text-xs font-semibold" :class="orderType === 'take-out' ? 'text-blue-600' : 'text-gray-400'">Take Out</span>
+        </button>
+      </div>
+
+      <!-- Payment Method -->
       <div class="flex gap-2 mb-4">
         <button
           class="flex-1 rounded-xl py-2.5 flex flex-col items-center gap-1 transition-all border-2"

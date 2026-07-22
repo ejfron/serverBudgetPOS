@@ -42,8 +42,7 @@ async function loadNextOrderNumber() {
   orderNumber.value = nums.length ? Math.max(...nums) + 1 : 1
 }
 
-// ✅ Updated: Auto-complete if no kitchen
-async function submitOrder(paymentMethod: string = 'cash') {
+async function submitOrder(paymentMethod: string = 'cash', orderType: string = 'dine-in') {
   if (!cart.value.length || !user.value) return
   loading.value = true
 
@@ -52,7 +51,8 @@ async function submitOrder(paymentMethod: string = 'cash') {
     user.value.id,
     cart.value,
     user.value.branch_name,
-    paymentMethod
+    paymentMethod,
+    orderType
   )
 
   if (!order) {
@@ -61,7 +61,6 @@ async function submitOrder(paymentMethod: string = 'cash') {
     return
   }
 
-  // ✅ If branch has NO kitchen, auto-complete the order
   if (!hasKitchen(user.value.business_type)) {
     await markCompleted(order.id)
   }
