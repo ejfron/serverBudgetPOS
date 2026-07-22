@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { PlusCircle, Trash2, Store, LogOut, Loader2, ChefHat, CookingPot, ShoppingBasket, Utensils, Plus } from '@lucide/vue'
+import { PlusCircle, Trash2, Store, LogOut, Loader2, ChefHat, CookingPot, ShoppingBasket, Utensils, Plus, Pizza } from '@lucide/vue'
 import { useServerConfig } from '~/composables/useServerConfig'
 import { BUSINESS_TYPES, hasKitchen, type BusinessType } from '@shared/types/business.types'
 
