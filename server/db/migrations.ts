@@ -1,5 +1,6 @@
 import db from './connection.js'
 
+
 export async function runMigrations() {
   try {
     await db.execute(`
@@ -179,7 +180,7 @@ async function seedCategories() {
   for (const name of ['Rice', 'Ulam', 'Drinks', 'Extras']) {
     await insert(`${name.toLowerCase()}_karinderya`, name, 'karinderya')
   }
-  for (const name of ['Dry Groceries', 'Condiments', 'Beverages', 'Snacks & Chichirya', 'Personal Care & Hygiene']) {
+  for (const name of ['Sabon', 'Drinks', 'Beverages', 'Snacks & Chichirya', 'Personal Care & Hygiene']) {
     await insert(name.toLowerCase().replace(/[^a-z0-9]/g, '_'), name, 'sarisari')
   }
   for (const name of ['Burgers', 'Fries', 'Drinks', 'Milktea', 'Tacos', 'Extras']) {
