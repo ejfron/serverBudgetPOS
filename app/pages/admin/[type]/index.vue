@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ClipboardList, Search, RefreshCw, TrendingUp, ShoppingBag, Store, Loader2 } from '@lucide/vue'
+import { ClipboardList, Search, RefreshCw, TrendingUp, ShoppingBag, Store, Loader2, UtensilsCrossed, Package } from '@lucide/vue'
 import { useServerConfig } from '~/composables/useServerConfig'
 import { isValidBusinessType } from '@shared/types/business.types'
 
@@ -145,6 +145,7 @@ onMounted(() => loadData())
         <thead class="bg-gray-50">
           <tr>
             <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Order</th>
+            <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Type</th>
             <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Items</th>
             <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Total</th>
             <th class="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Status</th>
@@ -154,6 +155,18 @@ onMounted(() => loadData())
         <tbody class="divide-y divide-gray-50">
           <tr v-for="order in filtered" :key="order.id" class="hover:bg-gray-50 transition">
             <td class="px-5 py-3.5 text-sm font-bold text-gray-800">#{{ String(order.order_number).padStart(3, '0') }}</td>
+            <td class="px-5 py-3.5">
+              <span
+                v-if="order.order_type"
+                class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full"
+                :class="order.order_type === 'take-out' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'"
+              >
+                <Package v-if="order.order_type === 'take-out'" class="w-3 h-3" />
+                <UtensilsCrossed v-else class="w-3 h-3" />
+                {{ order.order_type === 'take-out' ? 'Take Out' : 'Dine In' }}
+              </span>
+              <span v-else class="text-xs text-gray-300">—</span>
+            </td>
             <td class="px-5 py-3.5 text-sm text-gray-500 max-w-xs truncate">
               {{ order.order_items?.map((i: any) => `${i.item_name} x${i.quantity}`).join(', ') || '—' }}
             </td>

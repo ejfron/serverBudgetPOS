@@ -1,74 +1,86 @@
 <script setup lang="ts">
-import { Store, User, Lock, AlertCircle, Loader2, ArrowLeft } from '@lucide/vue'
+import { useServerConfig } from '~/composables/useServerConfig'
+import { ArrowLeft } from '@lucide/vue'
 
 definePageMeta({ layout: false })
+
+const { serverUrl } = useServerConfig()
 
 const businessName = ref('')
 const username = ref('')
 const password = ref('')
+const confirmPassword = ref('')
 const error = ref('')
 const loading = ref(false)
+const showPassword = ref(false)
 
-const router = useRouter()
-const { login } = useAuth()
-
-// ✅ Commented out for testing
-// onMounted(async () => {
-//   try {
-//     const { needsSetup } = await $fetch('/api/setup/status')
-//     if (!needsSetup) router.replace('/login')
-//   } catch (_) {}
-// })
+const { login, signupLocal, isNativeApp } = useAuth()
 
 async function handleSignup() {
-  loading.value = true
   error.value = ''
 
+  if (!businessName.value.trim() || !username.value.trim() || !password.value) {
+    error.value = 'All fields are required'
+    return
+  }
+  if (username.value.trim().length < 3) {
+    error.value = 'Username must be at least 3 characters'
+    return
+  }
+  if (password.value.length < 6) {
+    error.value = 'Password must be at least 6 characters'
+    return
+  }
+  if (password.value !== confirmPassword.value) {
+    error.value = 'Passwords do not match'
+    return
+  }
+
+  loading.value = true
+
   try {
-    const result = await $fetch('/api/setup/complete', {
-      method: 'POST',
-      body: {
-        businessName: businessName.value,
-        username: username.value,
+    // ✅ Native app: create the account entirely on-device, no network needed
+    if (isNativeApp()) {
+      const result = await signupLocal({
+        businessName: businessName.value.trim(),
+        username: username.value.trim(),
         password: password.value,
-      },
-    })
+      })
 
-    if (result.user) {
-      const auth = useAuth()
-      // ✅ Ensure business_type is empty to force setup page
-      auth.user.value = {
-        ...result.user,
-        business_type: result.user.business_type || '',
+      if (!result.ok) {
+        error.value = result.message || 'Unable to create account. Please try again.'
+        return
       }
-      localStorage.setItem('tapsilogan_user', JSON.stringify(auth.user.value))
-      await router.replace('/setup')
+
+      await navigateTo('/setup')
       return
     }
 
-    // Fallback login
-    const loginResult = await login({
-      username: username.value,
-      password: password.value,
-    })
+    // Web/dev fallback — original server-based signup
+    const res = await $fetch<{ success: boolean; user?: any; message?: string }>(
+      `${serverUrl.value}/api/setup/complete`,
+      {
+        method: 'POST' as const,
+        body: {
+          businessName: businessName.value.trim(),
+          username: username.value.trim(),
+          password: password.value,
+        },
+      },
+    )
 
-    if (!loginResult.ok) {
-      error.value = 'Account created but auto-login failed. Please log in manually.'
-      setTimeout(() => router.replace('/login'), 2000)
+    if (!res.success || !res.user) {
+      error.value = res.message || 'Unable to create account. Please try again.'
       return
     }
 
-    await router.replace('/setup')
-  } catch (e: any) {
-    console.error('Signup error:', e)
-
-    if (e.statusCode === 409) {
-      error.value = 'This username is already taken. Please choose another.'
-    } else if (e.statusCode === 400) {
-      error.value = e.data?.statusMessage || 'Invalid input. Please check your information.'
-    } else {
-      error.value = 'Unable to create account. Please try again.'
-    }
+    localStorage.setItem('tapsilogan_user', JSON.stringify(res.user))
+    await navigateTo('/setup')
+  } catch (err: any) {
+    console.error('Signup error:', err)
+    error.value = err?.data?.message
+      || err?.data?.statusMessage
+      || `Cannot connect to server. Make sure the server is running.`
   } finally {
     loading.value = false
   }
@@ -76,68 +88,105 @@ async function handleSignup() {
 </script>
 
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-linear-to-br from-orange-50 via-yellow-50 to-amber-100 p-4">
-    <div class="absolute top-0 right-0 w-64 h-64 bg-orange-400/10 rounded-full blur-3xl" />
-    <div class="absolute bottom-0 left-0 w-96 h-96 bg-yellow-400/10 rounded-full blur-3xl" />
-
+  <div class="min-h-screen bg-linear-to-br from-orange-50 to-amber-50 flex items-center justify-center p-4">
     <NuxtLink
       to="/"
-      class="absolute top-6 left-4 sm:left-6 z-10 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/70 backdrop-blur-md border border-white/60 shadow-sm text-sm font-semibold text-gray-700 hover:text-orange-600 hover:shadow-md transition-all"
+      class="absolute top-6 left-4 sm:left-6 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/70 backdrop-blur-md border border-white/60 shadow-sm text-sm font-semibold text-gray-700 hover:text-orange-600 hover:shadow-md transition-all"
     >
       <ArrowLeft :size="16" />
       Back
     </NuxtLink>
+    <div class="w-full max-w-md">
 
-    <div class="relative w-full max-w-lg bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-white/50 p-8 sm:p-10">
-      <div class="flex flex-col items-center mb-8">
-        <div class="w-60 h-40 flex items-center justify-center">
-          <img src="/uploads/ChatGPT Image Jul 18, 2026 at 10_13_50 AM.png" alt="BudgetPOS">
+      <div class="text-center mb-8">
+        <div class="inline-flex items-center justify-center">
+          <div class="w-60 h-40 flex items-center justify-center">
+            <img
+              src="/uploads/ChatGPT Image Jul 18, 2026 at 10_13_50 AM.png"
+              class="h-full w-auto object-contain"
+              alt="BudgetPOS"
+            />
+          </div>
         </div>
-        <h1 class="text-3xl font-extrabold text-gray-800">Create Your Account</h1>
-        <p class="text-sm text-gray-500 mt-2 text-center">
-          Sign up to start using Budget POS.
+        <p class="text-gray-500 text-sm -mt-9">Sign up to continue</p>
+      </div>
+
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">Business Name</label>
+          <input
+            v-model="businessName"
+            type="text"
+            placeholder="e.g. Tapsilogan ni Aling Maria"
+            class="w-full border border-gray-200 rounded-xl text-gray-600 px-4 py-3 text-sm focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+            @keyup.enter="handleSignup"
+          />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">Username</label>
+          <input
+            v-model="username"
+            type="text"
+            placeholder="Your login username"
+            class="w-full border border-gray-200  text-gray-600 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+            @keyup.enter="handleSignup"
+          />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
+          <div class="relative">
+            <input
+              v-model="password"
+              :type="showPassword ? 'text' : 'password'"
+              placeholder="At least 6 characters"
+              class="w-full border border-gray-200 rounded-xl text-gray-600 px-4 py-3 text-sm focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 pr-12"
+              @keyup.enter="handleSignup"
+            />
+            <button
+              type="button"
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs"
+              @click="showPassword = !showPassword"
+            >
+              {{ showPassword ? 'Hide' : 'Show' }}
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">Confirm Password</label>
+          <input
+            v-model="confirmPassword"
+            :type="showPassword ? 'text' : 'password'"
+            placeholder="Re-enter your password"
+            class="w-full border border-gray-200 rounded-xl text-gray-600 px-4 py-3 text-sm focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+            @keyup.enter="handleSignup"
+          />
+        </div>
+
+        <div v-if="error" class="bg-red-50 border border-red-200 rounded-xl p-3">
+          <p class="text-xs text-red-600">{{ error }}</p>
+        </div>
+
+        <button
+          :disabled="loading"
+          class="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-semibold py-3.5 rounded-xl transition-all text-sm flex items-center justify-center gap-2"
+          @click="handleSignup"
+        >
+          <span v-if="loading" class="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+          {{ loading ? 'Creating account...' : 'Create Account' }}
+        </button>
+
+        <p class="text-center text-sm text-gray-500">
+          Already have an account?
+          <NuxtLink to="/login" class="text-orange-500 font-semibold hover:underline">Sign in</NuxtLink>
         </p>
       </div>
 
-      <form @submit.prevent="handleSignup" class="space-y-5">
-        <div>
-          <label class="block text-sm font-semibold text-gray-700 mb-1">Business Name</label>
-          <div class="relative">
-            <Store :size="20" class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input v-model="businessName" type="text" required placeholder="e.g. Juan's Store" class="pl-10 py-2 w-full rounded-xl border-gray-200 bg-white/70 shadow-sm focus:border-orange-400 focus:ring focus:ring-orange-200 focus:ring-opacity-50 transition text-gray-600" />
-          </div>
-        </div>
-
-        <div>
-          <label class="block text-sm font-semibold text-gray-700 mb-1">Admin Username</label>
-          <div class="relative">
-            <User :size="20" class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input v-model="username" type="text" required placeholder="admin" class="pl-10 py-2 w-full rounded-xl border-gray-200 bg-white/70 shadow-sm focus:border-orange-400 focus:ring focus:ring-orange-200 focus:ring-opacity-50 transition text-gray-600" />
-          </div>
-        </div>
-
-        <div>
-          <label class="block text-sm font-semibold text-gray-700 mb-1">Password</label>
-          <div class="relative">
-            <Lock :size="20" class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input v-model="password" type="password" required minlength="6" placeholder="••••••••" class="pl-10 py-2 w-full rounded-xl border-gray-200 bg-white/70 shadow-sm focus:border-orange-400 focus:ring focus:ring-orange-200 focus:ring-opacity-50 transition text-gray-600" />
-          </div>
-          <p class="mt-1 text-xs text-gray-400">At least 6 characters</p>
-        </div>
-
-        <div v-if="error" class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm flex items-center space-x-2">
-          <AlertCircle :size="18" class="shrink-0" />
-          <span>{{ error }}</span>
-        </div>
-
-        <button type="submit" :disabled="loading" class="w-full py-3 px-4 bg-linear-to-r from-orange-500 to-amber-500 text-white font-semibold rounded-xl shadow-md hover:shadow-lg hover:from-orange-600 hover:to-amber-600 disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center space-x-2">
-          <Loader2 v-if="loading" :size="20" class="animate-spin text-white" />
-          <span>{{ loading ? 'Creating account...' : 'Sign Up & Continue' }}</span>
-        </button>
-      </form>
-
-      <p class="mt-6 text-center text-xs text-gray-400">
-        This will be your administrator account. You can add staff later.
+      <p class="text-center text-xs text-gray-400 mt-6">
+        BudgetPOS v1.0 · Affordable POS for Filipino Businesses
       </p>
     </div>
   </div>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { Heart, Target, Users2 } from '@lucide/vue'
+import HomeHeader from '~/components/shared/HomeHeader.vue'
 
 definePageMeta({ layout: false })
 
@@ -22,58 +23,13 @@ const values = [
   },
 ]
 
-const scrolled = ref(false)
-function onScroll() {
-  scrolled.value = window.scrollY > 20
-}
-onMounted(() => window.addEventListener('scroll', onScroll))
-onUnmounted(() => window.removeEventListener('scroll', onScroll))
 
-const handleSignIn = async () => await navigateTo('/login')
-const handleSignUp = async () => await navigateTo('/signup')
 </script>
 
 <template>
   <div class="min-h-screen bg-linear-to-br from-orange-50 via-yellow-50 to-amber-100">
-    <!-- Nav -->
-    <header class="fixed top-0 left-0 w-full z-50 px-4 sm:px-6 pt-6 transition-all duration-300">
-      <div
-        class="max-w-6xl mx-auto flex items-center justify-between gap-4 rounded-full px-4 sm:px-6 py-2 transition-all duration-300"
-        :class="scrolled
-           ? 'bg-white/70 backdrop-blur-md shadow-lg shadow-orange-900/5'
-          : 'bg-white/20 backdrop-blur-md shadow-lg shadow-orange-900/5'"
-      >
-        <NuxtLink to="/" class="flex items-center shrink-0">
-          <img
-            src="/uploads/ChatGPT Image Jul 18, 2026 at 10_13_50 AM.png"
-            class="h-16 sm:h-20 w-auto object-contain"
-            alt="BudgetPOS"
-          />
-        </NuxtLink>
-
-        <nav class="hidden md:flex items-center gap-8 text-base font-semibold text-gray-700">
-          <NuxtLink to="/" class="hover:text-orange-500 transition">Home</NuxtLink>
-          <NuxtLink to="/about" class="hover:text-orange-500 transition">About</NuxtLink>
-          <NuxtLink to="/features" class="hover:text-orange-500 transition">Features</NuxtLink>
-          <NuxtLink to="/pricing" class="hover:text-orange-500 transition">Pricing</NuxtLink>
-        </nav>
-
-        <div class="flex items-center gap-2 sm:gap-3 shrink-0">
-          <button
-            @click="handleSignIn"
-            class="px-4 py-2.5 sm:px-5 sm:py-3 text-sm sm:text-base font-semibold text-gray-700 hover:text-orange-600 transition"
-          >
-            Sign In
-          </button>
-          <button
-            @click="handleSignUp"
-            class="flex items-center gap-2 px-5 py-2.5 sm:px-6 sm:py-3 bg-linear-to-r from-orange-500 to-amber-500 text-white text-sm sm:text-base font-bold rounded-full shadow-md hover:shadow-lg hover:from-orange-600 hover:to-amber-600 transition-all"
-          >
-            Get Started
-          </button>
-        </div>
-      </div>
-    </header>
+ 
+    <HomeHeader />
 
     <!-- Hero -->
     <section class="max-w-3xl mx-auto text-center px-6 pt-40 sm:pt-44 pb-16">

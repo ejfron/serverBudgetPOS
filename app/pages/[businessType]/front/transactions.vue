@@ -5,12 +5,45 @@ import {
   Search, Filter, Trash2, XCircle, Edit3, Eye, 
   Loader2, AlertTriangle, CheckCircle, Clock, ChefHat, 
   X, RefreshCw, ChevronDown, ChevronUp, ShoppingBag, 
-  Plus, Minus, Banknote, CreditCard, ShieldAlert, Lock
+  Plus, Minus, Banknote, CreditCard, ShieldAlert, Lock, Printer
 } from '@lucide/vue'
 import { useServerConfig } from '~/composables/useServerConfig'
+import { usePosData } from '~/composables/usePosData'
+import { usePrinter } from '~/composables/usePrinter'
+
+const { printing: printerPrinting, printReceipt } = usePrinter()
+
+
+const paymentMethod = ref<'cash' | 'gcash'>('cash')
+const orderType = ref<'dine-in' | 'take-out'>('dine-in')
+const orderNote = ref('')
+
+const props = defineProps<{
+
+  
+  cart?: any[]
+  orderNumber?: number
+  loading?: boolean
+  printing?: boolean
+}>()
+
+const emit = defineEmits<{
+  increment: [id: string]
+  decrement: [id: string]
+  clear: []
+  submit: [paymentMethod: string, orderType: string, orderNote: string]
+}>()
 
 const { serverUrl } = useServerConfig()
 const { user, login } = useAuth()
+const {
+  isLocal,
+  getOrdersLocal,
+  voidOrderLocal,
+  deleteOrderLocal,
+  editOrderLocal,
+  verifyAdminLocal,
+} = usePosData()
 
 const orders = ref<any[]>([])
 const loading = ref(false)
@@ -41,9 +74,32 @@ const editTotal = computed(() =>
   editForm.value.items.reduce((sum: number, i: any) => sum + (i.quantity * i.unit_price), 0)
 )
 
+async function handlePrintOrder(order: any) {
+  if (printerPrinting.value) return // Prevent multiple clicks
+  
+  try {
+
+    const branchName = user.value?.branch_name || 'Store'
+    const businessType = user.value?.business_type
+    
+    const success = await printReceipt(order, branchName, businessType)
+    
+    if (success) {
+      console.log('Receipt printed successfully for order #' + String(order.order_number).padStart(3, '0'))
+    }
+  } catch (error) {
+    console.error('Failed to print receipt:', error)
+    alert('Failed to print receipt. Please try again.')
+  }
+}
+
 async function loadOrders() {
   loading.value = true
   try {
+    if (isLocal.value) {
+      orders.value = await getOrdersLocal()
+      return
+    }
     const res = await $fetch<any>(`${serverUrl.value}/api/orders?branch_id=${user.value?.branch_id}`)
     orders.value = res.data ?? []
   } catch (e) {
@@ -116,8 +172,22 @@ function requireAuth(action: 'edit' | 'void' | 'delete', order: any) {
 async function verifyAdmin() {
   adminError.value = ''
   processing.value = true
-  
+
   try {
+    if (isLocal.value) {
+      const ok = await verifyAdminLocal(adminPassword.value)
+      if (ok) {
+        adminAuthenticated.value = true
+        showAuthModal.value = false
+        if (pendingAction.value && selectedOrder.value) {
+          executeAction(pendingAction.value, selectedOrder.value)
+        }
+      } else {
+        adminError.value = 'Invalid admin password'
+      }
+      return
+    }
+
     const result = await $fetch(`${serverUrl.value}/api/auth/verify-admin`, {
       method: 'POST',
       body: { 
@@ -159,10 +229,14 @@ async function confirmVoid() {
   if (!selectedOrder.value) return
   processing.value = true
   try {
-    await $fetch(`${serverUrl.value}/api/orders/${selectedOrder.value.id}`, {
-      method: 'PATCH',
-      body: { status: 'voided' }
-    })
+    if (isLocal.value) {
+      await voidOrderLocal(selectedOrder.value.id)
+    } else {
+      await $fetch(`${serverUrl.value}/api/orders/${selectedOrder.value.id}`, {
+        method: 'PATCH',
+        body: { status: 'voided' }
+      })
+    }
     showVoidModal.value = false
     await loadOrders()
   } catch (e) {
@@ -182,9 +256,13 @@ async function confirmDelete() {
   if (!selectedOrder.value) return
   processing.value = true
   try {
-    await $fetch(`${serverUrl.value}/api/orders/${selectedOrder.value.id}`, {
-      method: 'DELETE'
-    })
+    if (isLocal.value) {
+      await deleteOrderLocal(selectedOrder.value.id)
+    } else {
+      await $fetch(`${serverUrl.value}/api/orders/${selectedOrder.value.id}`, {
+        method: 'DELETE'
+      })
+    }
     showDeleteModal.value = false
     await loadOrders()
   } catch (e) {
@@ -220,22 +298,26 @@ async function confirmEdit() {
   if (!selectedOrder.value) return
   processing.value = true
   try {
-    const totalAmount = editForm.value.items.reduce(
-      (sum: number, i: any) => sum + (i.quantity * i.unit_price), 0
-    )
-    await $fetch(`${serverUrl.value}/api/orders/${selectedOrder.value.id}`, {
-      method: 'PATCH',
-      body: {
-        order_items: editForm.value.items.map((i: any) => ({
-          item_name: i.item_name,
-          quantity: i.quantity,
-          unit_price: i.unit_price,
-          subtotal: i.quantity * i.unit_price
-        })),
-        total_amount: totalAmount,
-        payment_method: editForm.value.payment_method
-      }
-    })
+    if (isLocal.value) {
+      await editOrderLocal(selectedOrder.value.id, editForm.value.items, editForm.value.payment_method)
+    } else {
+      const totalAmount = editForm.value.items.reduce(
+        (sum: number, i: any) => sum + (i.quantity * i.unit_price), 0
+      )
+      await $fetch(`${serverUrl.value}/api/orders/${selectedOrder.value.id}`, {
+        method: 'PATCH',
+        body: {
+          order_items: editForm.value.items.map((i: any) => ({
+            item_name: i.item_name,
+            quantity: i.quantity,
+            unit_price: i.unit_price,
+            subtotal: i.quantity * i.unit_price
+          })),
+          total_amount: totalAmount,
+          payment_method: editForm.value.payment_method
+        }
+      })
+    }
     showEditModal.value = false
     await loadOrders()
   } catch (e) {
@@ -244,6 +326,10 @@ async function confirmEdit() {
   } finally {
     processing.value = false
   }
+}
+
+function handleSubmit() {
+  emit('submit', paymentMethod.value, orderType.value, orderNote.value)
 }
 
 onMounted(() => {
@@ -291,7 +377,7 @@ onMounted(() => {
     </div>
 
     <div class="flex flex-wrap gap-2 sm:gap-3">
-      <div class="relative flex-1 min-w-[150px] sm:min-w-[200px]">
+      <div class="relative flex-1 min-w-37.5 sm:min-w-50">
         <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
         <input v-model="searchQuery" placeholder="Search order # or item..." class="w-full pl-8 sm:pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-orange-400 shadow-sm" />
       </div>
@@ -319,7 +405,7 @@ onMounted(() => {
             <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center font-bold text-xs sm:text-sm shrink-0" :class="(order.payment_method || 'cash') === 'gcash' ? 'bg-blue-50 text-blue-600' : 'bg-green-50 text-green-600'">#{{ String(order.order_number).padStart(3, '0') }}</div>
             <div class="min-w-0 flex-1">
               <div class="flex items-center gap-2 flex-wrap">
-                <p class="text-xs sm:text-sm font-semibold text-gray-800 truncate max-w-[150px] sm:max-w-[250px]">{{ order.order_items?.map((i: any) => i.item_name).join(', ') || '—' }}</p>
+                <p class="text-xs sm:text-sm font-semibold text-gray-800 truncate max-w-37.5 sm:max-w-62.5">{{ order.order_items?.map((i: any) => i.item_name).join(', ') || '—' }}</p>
                 <span class="text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded-md border shrink-0" :class="[getStatusBadge(order.status).bg, getStatusBadge(order.status).color, getStatusBadge(order.status).border]">{{ getStatusBadge(order.status).label }}</span>
                 <span class="text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-orange-50 text-orange-600 border border-orange-200 shrink-0">{{ (order.payment_method || 'cash') === 'gcash' ? 'GCash' : 'Cash' }}</span>
               </div>
@@ -345,11 +431,20 @@ onMounted(() => {
           </div>
           <p class="text-[10px] sm:text-xs text-gray-400 mb-3">Cashier: {{ order.cashier || 'Unknown' }}</p>
 
-          <!-- ✅ Actions available for ALL statuses except voided -->
           <div v-if="order.status !== 'voided'" class="flex gap-2 flex-wrap">
             <button class="flex items-center gap-1 px-3 py-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 text-xs font-semibold transition" @click="requireAuth('edit', order)"><Edit3 class="w-3 h-3" /> Edit</button>
             <button v-if="order.status !== 'voided'" class="flex items-center gap-1 px-3 py-2 rounded-lg bg-yellow-50 text-yellow-600 hover:bg-yellow-100 text-xs font-semibold transition" @click="requireAuth('void', order)"><XCircle class="w-3 h-3" /> Void</button>
             <button class="flex items-center gap-1 px-3 py-2 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 text-xs font-semibold transition" @click="requireAuth('delete', order)"><Trash2 class="w-3 h-3" /> Delete</button>
+         
+            <button 
+              class="flex items-center gap-1 px-3 py-2 rounded-lg bg-green-50 text-green-500 hover:bg-green-100 text-xs font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+              :disabled="printerPrinting"
+              @click.stop="handlePrintOrder(order)"
+            >
+              <Loader2 v-if="printerPrinting" class="w-3 h-3 animate-spin" />
+              <Printer v-else class="w-3 h-3" />
+              {{ printerPrinting ? 'Printing...' : 'Print Again' }}
+            </button>
           </div>
           <div v-else class="flex items-center gap-1.5 text-[10px] sm:text-xs text-gray-400"><XCircle class="w-3 h-3 text-red-400" /> This order has been voided</div>
         </div>

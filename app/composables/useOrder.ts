@@ -1,20 +1,22 @@
-// composables/useOrder.ts
 import type { Order, CartLine, OrderStatus } from '@shared/types/order.types'
+import { useServerConfig } from './useServerConfig'
 
 export function useOrder() {
-  const config = useRuntimeConfig()
-  const base = config.public.serverUrl
-
-  const { printReceipt, connected: printerConnected } = usePrinter()
+  const { serverUrl } = useServerConfig()
+  const { printReceipt } = usePrinter()
   const printing = ref(false)
   const lastPrintOk = ref<boolean | null>(null)
+
+  function base(): string {
+    return serverUrl.value
+  }
 
   async function fetchOrders(branchId: string, status?: OrderStatus): Promise<Order[]> {
     try {
       const params = new URLSearchParams({ branch_id: branchId })
       if (status) params.append('status', status)
       const res = await $fetch<{ success: boolean; data: Order[] }>(
-        `${base}/api/orders?${params}`,
+        `${base()}/api/orders?${params}`,
       )
       return res.data ?? []
     } catch (err) {
@@ -23,57 +25,57 @@ export function useOrder() {
     }
   }
 
-  async function placeOrder(
-    branchId: string,
-    createdBy: string,
-    cart: CartLine[],
-    branchName: string,
-    paymentMethod: string = 'cash', 
-    orderType: string = 'dine-in',
-  ): Promise<Order | null> {
-    try {
-      const res = await $fetch<{ success: boolean; data: Order }>(
-        `${base}/api/orders`,
-        {
-          method: 'POST' as const,
-          body: {
-            branch_id: branchId,
-            created_by: createdBy,
-            items: cart,
-            payment_method: paymentMethod,  
-            order_type: orderType, 
-          },
+async function placeOrder(
+  branchId: string,
+  createdBy: string,
+  cart: CartLine[],
+  branchName: string,
+  paymentMethod = 'cash',
+  orderType = 'dine-in',
+  orderNote: string,
+  businessType?: string,   
+): Promise<Order | null> {
+  try {
+    const res = await $fetch<{ success: boolean; data: Order }>(
+      `${base()}/api/orders`,
+      {
+        method: 'POST',
+        body: {
+          branch_id: branchId,
+          created_by: createdBy,
+          items: cart,
+          payment_method: paymentMethod,
+          order_type: orderType,
+          notes_type: orderNote,
         },
-      )
-      const order = res.data ?? null
+      },
+    )
+    const order = res.data ?? null
 
-      if (order) {
-        // ✅ Attach payment method to order object for printing
-        const orderForPrint = { ...order, payment_method: paymentMethod }
-        
-        printing.value = true
-        lastPrintOk.value = null
-        try {
-          const receiptBranchName = branchName || 'TAPSILOGAN'
-          lastPrintOk.value = await printReceipt(orderForPrint, receiptBranchName)
-        } catch {
-          lastPrintOk.value = false
-        } finally {
-          printing.value = false
-        }
+    if (order) {
+      const orderForPrint = { ...order, payment_method: paymentMethod }
+      printing.value = true
+      lastPrintOk.value = null
+      try {
+        lastPrintOk.value = await printReceipt(orderForPrint, branchName || 'Branch', businessType)
+      } catch {
+        lastPrintOk.value = false
+      } finally {
+        printing.value = false
       }
-
-      return order
-    } catch (err) {
-      console.error('placeOrder error:', err)
-      return null
     }
+
+    return order
+  } catch (err) {
+    console.error('placeOrder error:', err)
+    return null
   }
+}
 
   async function markReady(orderId: string): Promise<boolean> {
     try {
-      await $fetch(`${base}/api/orders/${orderId}`, {
-        method: 'PATCH' as 'POST',
+      await $fetch(`${base()}/api/orders/${orderId}`, {
+        method: 'PATCH', // ✅ Changed from 'POST' to 'PATCH'
         body: { status: 'ready' },
       })
       return true
@@ -82,8 +84,8 @@ export function useOrder() {
 
   async function markCompleted(orderId: string): Promise<boolean> {
     try {
-      await $fetch(`${base}/api/orders/${orderId}`, {
-        method: 'PATCH' as 'POST',
+      await $fetch(`${base()}/api/orders/${orderId}`, {
+        method: 'PATCH', // 
         body: { status: 'completed' },
       })
       return true
@@ -97,13 +99,11 @@ export function useOrder() {
     markCompleted,
     printing,
     lastPrintOk,
-    printerConnected,
   }
 }
 
 export function useLiveOrders(branchId: string, status?: OrderStatus, intervalMs = 4000) {
   const { fetchOrders } = useOrder()
-
   const orders = ref<Order[]>([])
   const isLoading = ref(false)
   const synced = ref(false)

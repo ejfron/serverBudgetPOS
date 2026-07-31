@@ -116,7 +116,7 @@ async function submitBranches() {
     
     <!-- Admin Account Card -->
     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-      <div class="bg-gradient-to-r from-orange-500 to-amber-500 px-6 py-4">
+      <div class="bg-linear-to-r from-orange-500 to-amber-500 px-6 py-4">
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
             <User :size="20" class="text-white" />
@@ -319,7 +319,7 @@ async function submitBranches() {
       <button
         @click="submitBranches"
         :disabled="adding || newBranches.length === 0"
-        class="w-full py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold rounded-xl shadow-md hover:shadow-lg disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+        class="w-full py-3 bg-linear-to-r from-orange-500 to-amber-500 text-white font-semibold rounded-xl shadow-md hover:shadow-lg disabled:opacity-50 transition-all flex items-center justify-center gap-2"
       >
         <Loader2 v-if="adding" :size="20" class="animate-spin" />
         {{ adding ? 'Saving...' : 'Save New Branches' }}

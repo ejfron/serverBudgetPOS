@@ -1,19 +1,27 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'front' })
 
-import { Store, Printer, Coins, Save, Settings as SettingsIcon } from '@lucide/vue'
+import { Store, Printer, Coins, Save, Settings as SettingsIcon, UtensilsCrossed } from '@lucide/vue'
+import { usePrinter } from '~/composables/usePrinter'
 
 const { user } = useAuth()
+const { printKitchenCopy, setPrintKitchenCopy } = usePrinter()
 
 const form = reactive({
   branchName: user.value?.branch_name || '',
   printerEnabled: true,
   currency: 'PHP',
+  printKitchenCopy: printKitchenCopy.value, // Initialize from printer settings
 })
 
 const saved = ref(false)
+
 function handleSave() {
-  // Wire up to a real settings endpoint later — for now just a local confirm flash
+  // Save kitchen copy preference
+  setPrintKitchenCopy(form.printKitchenCopy)
+  
+  // Save other settings (branch name, etc.)
+  // Wire up to a real settings endpoint later
   saved.value = true
   setTimeout(() => (saved.value = false), 2000)
 }
@@ -51,6 +59,21 @@ function handleSave() {
         <label for="printerEnabled" class="text-sm text-gray-700">Enable Printer</label>
       </div>
 
+      <!-- Kitchen Copy Toggle -->
+      <div class="flex items-center gap-2 py-1">
+        <UtensilsCrossed class="w-4 h-4 text-gray-400" />
+        <input
+          id="printKitchenCopy"
+          v-model="form.printKitchenCopy"
+          type="checkbox"
+          class="h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-400"
+        />
+        <label for="printKitchenCopy" class="text-sm text-gray-700">
+          Print Kitchen Copy
+          <span class="text-xs text-gray-400 ml-1">(Prints a separate copy for the kitchen)</span>
+        </label>
+      </div>
+
       <div>
         <label for="currency" class="flex items-center gap-1.5 text-sm font-medium text-gray-700">
           <Coins class="w-4 h-4 text-gray-400" />
@@ -75,7 +98,7 @@ function handleSave() {
         Save Settings
       </button>
 
-      <p v-if="saved" class="text-xs text-green-600 font-medium">✓ Settings saved</p>
+      <p v-if="saved" class="text-xs text-green-600 font-medium">✓ Settings saved (including printer preferences)</p>
     </form>
   </div>
 </template>

@@ -13,7 +13,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Invalid business type' })
   }
 
-  // Check if branch exists
+
   const branch = db.prepare('SELECT id FROM branches WHERE id = ?').get(branch_id)
   if (!branch) {
     throw createError({ statusCode: 404, statusMessage: 'Branch not found' })

@@ -1,6 +1,3 @@
-// composables/usePrinter.ts
-
-// Singleton state shared across all components
 const connected = ref(false)
 const lastError = ref<string | null>(null)
 const connectedDevice = ref<{ id: string; name: string } | null>(null)
@@ -8,11 +5,34 @@ const scanning = ref(false)
 const pairedDevices = ref<any[]>([])
 const errorMsg = ref('')
 const successMsg = ref('')
+const printing = ref(false)
 
-// Paper width in characters — 32 for 58mm, 42 for 80mm printers.
 const paperChars = ref<32 | 42>(32)
+const printKitchenCopy = ref(true) // Default to true for backward compatibility
 
 let initialized = false
+
+const businessTypeLabels: Record<string, string> = {
+  tapsilogan: 'TAPSILOGAN',
+  restaurant: 'RESTAURANT',
+  fastfood: 'FAST FOOD',
+  karinderya: 'KARINDERYA',
+  sarisari: 'SARI-SARI STORE',
+}
+
+function getReceiptHeader(businessType?: string): string {
+  return businessTypeLabels[businessType ?? ''] ?? 'TAPSILOGAN'
+}
+
+function priceTypeSuffix(item: any): string {
+  const tier = item.price_type === 'wholesale' ? 'Wholesale'
+    : item.price_type === 'custom' ? 'Custom'
+    : ''
+  const parts: string[] = []
+  if (item.size_name) parts.push(item.size_name)
+  if (tier) parts.push(tier)
+  return parts.length ? ` (${parts.join(', ')})` : ''
+}
 
 export function usePrinter() {
 
@@ -32,22 +52,28 @@ export function usePrinter() {
     }
   }
 
-  // ✅ Safe initialization — NO auto-reconnect on app start
   if (!initialized && import.meta.client) {
     initialized = true
     try {
-      // ✅ Don't auto-reconnect — prevents crash on app startup
-      // const saved = localStorage.getItem('tapsilogan_printer')
-      // if (saved && isNative()) autoReconnect(JSON.parse(saved))
-
       const savedWidth = localStorage.getItem('tapsilogan_printer_width')
       if (savedWidth === '32' || savedWidth === '42') paperChars.value = Number(savedWidth) as 32 | 42
+      
+      // Load kitchen copy preference
+      const savedKitchenCopy = localStorage.getItem('tapsilogan_print_kitchen_copy')
+      if (savedKitchenCopy !== null) {
+        printKitchenCopy.value = savedKitchenCopy === 'true'
+      }
     } catch {}
   }
 
   function setPaperWidth(chars: 32 | 42) {
     paperChars.value = chars
     localStorage.setItem('tapsilogan_printer_width', String(chars))
+  }
+
+  function setPrintKitchenCopy(enabled: boolean) {
+    printKitchenCopy.value = enabled
+    localStorage.setItem('tapsilogan_print_kitchen_copy', String(enabled))
   }
 
   async function autoReconnect(device: { id: string; name: string }) {
@@ -168,7 +194,6 @@ export function usePrinter() {
     localStorage.removeItem('tapsilogan_printer')
   }
 
-  // ✅ Safe connect — returns false on error instead of crashing
   async function connect(): Promise<boolean> {
     if (isElectron()) {
       try {
@@ -184,9 +209,11 @@ export function usePrinter() {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // Build ESC/POS byte array — Customer Copy + Kitchen Copy
+  // Build ESC/POS byte array — Customer Copy + Optional Kitchen Copy
   // ─────────────────────────────────────────────────────────────
-  function buildBytes(order: any, branchName: string): Uint8Array {
+  function buildBytes(order: any, branchName: string, businessType?: string, includeKitchenCopy?: boolean): Uint8Array {
+    const shouldPrintKitchen = includeKitchenCopy ?? printKitchenCopy.value
+    
     const ESC = 0x1B
     const GS  = 0x1D
     const W = paperChars.value
@@ -202,12 +229,15 @@ export function usePrinter() {
     const date = now.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
     const time = now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })
     const paymentLabel = order.payment_method === 'gcash' ? 'Payment: GCash' : 'Payment: Cash'
+    const orderType = order.order_type === 'take-out' ? 'Order Type: Take out' : 'Order Type: Dine In'
+    const showOrderType = businessType !== 'sarisari'
+    const headerLabel = getReceiptHeader(businessType)
 
     // ═══════════ CUSTOMER COPY ═══════════
     cmd(ESC, 0x40)
     cmd(ESC, 0x61, 0x01)
     cmd(ESC, 0x45, 0x01, ESC, 0x21, 0x10)
-    ln('TAPSILOGAN')
+    ln(headerLabel)
     cmd(ESC, 0x21, 0x00, ESC, 0x45, 0x00)
     ln(branchName)
     ln()
@@ -223,7 +253,7 @@ export function usePrinter() {
     rule('-')
 
     for (const item of order.order_items ?? []) {
-      ln(item.item_name)
+      ln(`${item.item_name}${priceTypeSuffix(item)}`)
       ln(pad(`  ${item.quantity} x ${p(item.unit_price)}`, p(item.subtotal)))
     }
 
@@ -233,6 +263,7 @@ export function usePrinter() {
     cmd(ESC, 0x45, 0x00)
     rule('-')
     ln(paymentLabel)
+    if (showOrderType) ln(orderType)
     rule('-')
     cmd(ESC, 0x61, 0x01)
     ln()
@@ -243,38 +274,42 @@ export function usePrinter() {
     ln()
     cmd(ESC, 0x64, 2)
 
-    // ═══════════ KITCHEN COPY ═══════════
-    cmd(ESC, 0x61, 0x01)
-    cmd(ESC, 0x45, 0x01, ESC, 0x21, 0x10)
-    ln('KITCHEN COPY')
-    cmd(ESC, 0x21, 0x00, ESC, 0x45, 0x00)
-    ln()
-    cmd(ESC, 0x61, 0x00)
-    rule('=')
-    cmd(ESC, 0x45, 0x01)
-    ln(`Order #${String(order.order_number).padStart(3, '0')}`)
-    cmd(ESC, 0x45, 0x00)
-    ln(`Time: ${time}`)
-    rule('=')
-    ln()
-
-    for (const item of order.order_items ?? []) {
+    // ═══════════ KITCHEN COPY (Optional) ═══════════
+    if (shouldPrintKitchen) {
+      cmd(ESC, 0x61, 0x01)
+      cmd(ESC, 0x45, 0x01, ESC, 0x21, 0x10)
+      ln('KITCHEN COPY')
+      cmd(ESC, 0x21, 0x00, ESC, 0x45, 0x00)
+      ln()
+      cmd(ESC, 0x61, 0x00)
+      rule('=')
       cmd(ESC, 0x45, 0x01)
-      ln(`${item.quantity}x  ${item.item_name}`)
+      ln(`Order #${String(order.order_number).padStart(3, '0')}`)
       cmd(ESC, 0x45, 0x00)
-    }
+      ln(`Time: ${time}`)
+      rule('=')
+      ln()
 
-    ln()
-    rule('-')
-    cmd(ESC, 0x45, 0x01)
-    ln(`TOTAL: ${p(order.total_amount)}`)
-    cmd(ESC, 0x45, 0x00)
-    ln(paymentLabel)
-    rule('-')
-    cmd(ESC, 0x61, 0x01)
-    ln()
-    ln('--- KITCHEN COPY ---')
-    ln()
+      for (const item of order.order_items ?? []) {
+        cmd(ESC, 0x45, 0x01)
+        ln(`${item.quantity}x  ${item.item_name}${priceTypeSuffix(item)}`)
+        cmd(ESC, 0x45, 0x00)
+      }
+
+      ln()
+      rule('-')
+      cmd(ESC, 0x45, 0x01)
+      ln(`TOTAL: ${p(order.total_amount)}`)
+      cmd(ESC, 0x45, 0x00)
+      ln(paymentLabel)
+      if (showOrderType) ln(orderType)
+      rule('-')
+      cmd(ESC, 0x61, 0x01)
+      ln()
+      ln('--- KITCHEN COPY ---')
+      ln()
+    }
+    
     cmd(ESC, 0x64, 3)
     cmd(GS, 0x56, 0x41, 0x03)
 
@@ -297,6 +332,7 @@ export function usePrinter() {
     ln(new Date().toLocaleString('en-PH'))
     ln('If you can read this,')
     ln('your printer is ready.')
+    ln('Thank you for choosing Budget POS.')
     ln()
     cmd(ESC, 0x64, 3)
     cmd(GS, 0x56, 0x41, 0x03)
@@ -317,6 +353,7 @@ export function usePrinter() {
       alert('Connect a printer first.')
       return false
     }
+    printing.value = true
     try {
       await writeBytes(buildTestBytes())
       return true
@@ -325,11 +362,16 @@ export function usePrinter() {
       alert(`Test print failed: ${lastError.value}`)
       connected.value = false
       return false
+    } finally {
+      printing.value = false
     }
   }
 
-  function printViaBrowser(order: any, branchName: string): boolean {
+  function printViaBrowser(order: any, branchName: string, businessType?: string, includeKitchenCopy?: boolean): boolean {
     if (!import.meta.client) return false
+    
+    const shouldPrintKitchen = includeKitchenCopy ?? printKitchenCopy.value
+    
     try {
       const iframe = document.createElement('iframe')
       Object.assign(iframe.style, { position: 'fixed', width: '0', height: '0', border: 'none' })
@@ -338,6 +380,30 @@ export function usePrinter() {
       const p = (n: number) => `₱${Number(n).toFixed(2)}`
       const now = new Date(order.created_at)
       const paymentLabel = order.payment_method === 'gcash' ? 'GCash' : 'Cash'
+      const orderType = order.order_type === 'take-out' ? 'Order Type: Take out' : 'Order Type: Dine In'
+      const showOrderType = businessType !== 'sarisari'
+      const headerLabel = getReceiptHeader(businessType)
+      
+      // Kitchen copy HTML (only if enabled)
+      const kitchenCopyHtml = shouldPrintKitchen ? `
+        <div style="margin-top:16px"></div>
+        <div class="div2"></div>
+        <div class="c b big">KITCHEN COPY</div>
+        <div class="div2"></div>
+        <div class="b">Order #${String(order.order_number).padStart(3, '0')}</div>
+        <div>Time: ${now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}</div>
+        <div class="div2"></div>
+        ${(order.order_items ?? []).map((i: any) => `
+          <div class="b">${i.quantity}x  ${i.item_name}${(i.size_name || (i.price_type && i.price_type !== 'regular')) ? ` (${[i.size_name, i.price_type === 'wholesale' ? 'Wholesale' : i.price_type === 'custom' ? 'Custom' : null].filter(Boolean).join(', ')})` : ''}</div>
+        `).join('')}
+        <div class="div"></div>
+        <div class="row b"><span>TOTAL</span><span>${p(order.total_amount)}</span></div>
+        <div>Payment: ${paymentLabel}</div>
+        ${showOrderType ? `<div>${orderType}</div>` : ''}
+        <div class="div"></div>
+        <div class="c">--- KITCHEN COPY ---</div>
+      ` : ''
+      
       doc.open()
       doc.write(`
         <html><head><style>
@@ -348,8 +414,9 @@ export function usePrinter() {
           .sub{padding-left:8px}
           .div{border-top:1px dashed #000;margin:4px 0}
           .div2{border-top:2px solid #000;margin:6px 0}
+          .tier{color:#555;font-size:10px}
         </style></head><body>
-        <div class="c b big">TAPSILOGAN</div>
+        <div class="c b big">${headerLabel}</div>
         <div class="c">${branchName}</div>
         <div class="div"></div>
         <div>Order #: ${String(order.order_number).padStart(3, '0')}</div>
@@ -359,33 +426,20 @@ export function usePrinter() {
         <div class="row b"><span>ITEM</span><span>AMOUNT</span></div>
         <div class="div"></div>
         ${(order.order_items ?? []).map((i: any) => `
-          <div>${i.item_name}</div>
+          <div>${i.item_name}${(i.size_name || (i.price_type && i.price_type !== 'regular')) ? `<span class="tier"> (${[i.size_name, i.price_type === 'wholesale' ? 'Wholesale' : i.price_type === 'custom' ? 'Custom' : null].filter(Boolean).join(', ')})</span>` : ''}</div>
           <div class="row sub"><span>${i.quantity} x ${p(i.unit_price)}</span><span>${p(i.subtotal)}</span></div>
         `).join('')}
         <div class="div"></div>
         <div class="row b"><span>TOTAL</span><span>${p(order.total_amount)}</span></div>
         <div class="div"></div>
         <div>Payment: ${paymentLabel}</div>
+        ${showOrderType ? `<div>${orderType}</div>` : ''}
         <div class="div"></div>
         <div class="c">Salamat po!</div>
         <div class="c">Balik kayo :)</div>
         <div class="div"></div>
         <div class="c">--- CUSTOMER COPY ---</div>
-        <div style="margin-top:16px"></div>
-        <div class="div2"></div>
-        <div class="c b big">KITCHEN COPY</div>
-        <div class="div2"></div>
-        <div class="b">Order #${String(order.order_number).padStart(3, '0')}</div>
-        <div>Time: ${now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}</div>
-        <div class="div2"></div>
-        ${(order.order_items ?? []).map((i: any) => `
-          <div class="b">${i.quantity}x  ${i.item_name}</div>
-        `).join('')}
-        <div class="div"></div>
-        <div class="row b"><span>TOTAL</span><span>${p(order.total_amount)}</span></div>
-        <div>Payment: ${paymentLabel}</div>
-        <div class="div"></div>
-        <div class="c">--- KITCHEN COPY ---</div>
+        ${kitchenCopyHtml}
         </body></html>
       `)
       doc.close()
@@ -399,40 +453,48 @@ export function usePrinter() {
     }
   }
 
-  async function printReceipt(order: any, branchName: string): Promise<boolean> {
-    if (isElectron()) {
-      try {
-        const result = await (window as any).electronAPI.printReceipt(order, branchName)
-        return result.ok ?? false
-      } catch { return false }
-    }
-
-    if (isNative()) {
-      if (!connected.value || !connectedDevice.value) {
-        alert('No printer connected. Tap "Connect printer" in the header first.')
-        return false
+  async function printReceipt(order: any, branchName: string, businessType?: string, includeKitchenCopy?: boolean): Promise<boolean> {
+    const shouldPrintKitchen = includeKitchenCopy ?? printKitchenCopy.value
+    
+    printing.value = true
+    try {
+      if (isElectron()) {
+        try {
+          const result = await (window as any).electronAPI.printReceipt(order, branchName, businessType, shouldPrintKitchen)
+          return result.ok ?? false
+        } catch { return false }
       }
-      try {
-        await writeBytes(buildBytes(order, branchName))
-        console.log('✅ Receipt printed successfully')
-        return true
-      } catch (err: any) {
-        lastError.value = err?.message ?? 'Print failed'
-        alert(`Print failed: ${lastError.value}`)
-        connected.value = false
-        return false
-      }
-    }
 
-    return printViaBrowser(order, branchName)
+      if (isNative()) {
+        if (!connected.value || !connectedDevice.value) {
+          alert('No printer connected. Tap "Connect printer" in the header first.')
+          return false
+        }
+        try {
+          await writeBytes(buildBytes(order, branchName, businessType, shouldPrintKitchen))
+          console.log('✅ Receipt printed successfully')
+          return true
+        } catch (err: any) {
+          lastError.value = err?.message ?? 'Print failed'
+          alert(`Print failed: ${lastError.value}`)
+          connected.value = false
+          return false
+        }
+      }
+
+      return printViaBrowser(order, branchName, businessType, shouldPrintKitchen)
+    } finally {
+      printing.value = false
+    }
   }
 
   return {
     connected, lastError, connectedDevice,
     scanning, pairedDevices, errorMsg, successMsg,
     paperChars, setPaperWidth,
+    printKitchenCopy, setPrintKitchenCopy,
     isNative, isElectron,
     connect, scanDevices, selectDevice,
-    disconnectPrinter, printReceipt, printViaBrowser, testPrint,
+    disconnectPrinter, printReceipt, printViaBrowser, testPrint, printing,
   }
 }

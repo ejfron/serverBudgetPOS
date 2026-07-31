@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { PlusCircle, Trash2, Store, LogOut, Loader2, ChefHat, CookingPot, ShoppingBasket, Utensils, Plus, Pizza } from '@lucide/vue'
 import { useServerConfig } from '~/composables/useServerConfig'
+import { usePosData } from '~/composables/usePosData'
 import { BUSINESS_TYPES, hasKitchen, type BusinessType } from '@shared/types/business.types'
 
 definePageMeta({ layout: false })
 
 const { serverUrl } = useServerConfig()
-const { logout, user, updateBusinessType } = useAuth()
+const { logout, user, updateBusinessType, isNativeApp } = useAuth()
+const { createBranchesLocal } = usePosData()
 const router = useRouter()
 
 const typeIcons: Record<BusinessType, any> = {
@@ -93,6 +95,30 @@ async function submitBranches() {
   }
 
   try {
+    // ✅ Native app: create everything on-device, no network calls at all
+    if (isNativeApp()) {
+      if (branches.value.length > 0) {
+        const payload = branches.value.map(b => ({
+          name: b.name,
+          location: b.location || '',
+          business_type: selectedType.value,
+          hasKitchen: b.hasKitchen,
+          cashierUsername: b.cashierUsername,
+          cashierPassword: b.cashierPassword,
+          kitchenUsername: b.hasKitchen ? b.kitchenUsername : '',
+          kitchenPassword: b.hasKitchen ? b.kitchenPassword : '',
+        }))
+
+        await createBranchesLocal(payload, user.value?.branch_id)
+      }
+
+      updateBusinessType(selectedType.value)
+      successMsg.value = 'Setup complete!'
+      setTimeout(() => router.replace('/admin'), 1000)
+      return
+    }
+
+    // Web/dev fallback — original server-based setup
     if (user.value?.branch_id) {
       await $fetch(`${serverUrl.value}/api/setup/business-type`, {
         method: 'POST',
@@ -115,12 +141,11 @@ async function submitBranches() {
         kitchenPassword: b.hasKitchen ? b.kitchenPassword : '',
       }))
 
-      // ✅ Send admin_branch_id so branches are linked to this admin
       await $fetch(`${serverUrl.value}/api/branches`, {
         method: 'POST',
-        body: { 
+        body: {
           branches: payload,
-          admin_branch_id: user.value?.branch_id 
+          admin_branch_id: user.value?.branch_id,
         },
       })
     }

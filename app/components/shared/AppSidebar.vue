@@ -11,32 +11,32 @@
     <nav class="flex-1 px-3 py-4 space-y-1">
       <NuxtLink
         :to="`/admin/${currentType}`"
-        class="flex items-center px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
-        active-class="bg-gray-100 text-gray-900 font-medium"
+        class="flex items-center px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100 transition-colors"
+        active-class="bg-gray-100 text-gray-900 font-semibold"
       >
         <Icon name="mdi:view-dashboard" class="w-5 h-5 mr-3" />
         Dashboard
       </NuxtLink>
       <NuxtLink
         :to="`/admin/${currentType}/branches`"
-        class="flex items-center px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
-        active-class="bg-gray-100 text-gray-900 font-medium"
+        class="flex items-center px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100 transition-colors"
+        active-class="bg-gray-100 text-gray-900 font-semibold"
       >
         <Icon name="mdi:office-building" class="w-5 h-5 mr-3" />
         Branches
       </NuxtLink>
       <NuxtLink
         :to="`/admin/${currentType}/AddProductBranches`"
-        class="flex items-center px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
-        active-class="bg-gray-100 text-gray-900 font-medium"
+        class="flex items-center px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100 transition-colors"
+        active-class="bg-gray-100 text-gray-900 font-semibold"
       >
         <Icon name="mdi:shopping" class="w-5 h-5 mr-3" />
         Menu Items
       </NuxtLink>
       <NuxtLink
         :to="`/admin/${currentType}/admin-settings`"
-        class="flex items-center px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
-        active-class="bg-gray-100 text-gray-900 font-medium"
+        class="flex items-center px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100 transition-colors"
+        active-class="bg-gray-100 text-gray-900 font-semibold"
       >
         <Icon name="mdi:cog" class="w-5 h-5 mr-3" />
         Settings
@@ -46,7 +46,7 @@
     <div class="px-3 py-4 border-t border-gray-200">
       <button
         @click="handleLogout"
-        class="flex items-center w-full px-3 py-2 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
+        class="flex items-center w-full px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50 transition-colors"
       >
         <Icon name="mdi:logout" class="w-5 h-5 mr-3" />
         Log out
@@ -66,40 +66,40 @@
     <nav class="flex-1 px-3 py-4 space-y-1">
       <NuxtLink
         :to="`/${businessType}/front`"
-        class="flex items-center px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
-        active-class="bg-gray-100 text-gray-900 font-medium"
+        class="flex items-center px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100 transition-colors"
+        active-class="bg-gray-100 text-gray-900 font-semibold"
       >
         <Icon name="mdi:menu" class="w-5 h-5 mr-3" />
         Menu
       </NuxtLink>
       <NuxtLink
         :to="`/${businessType}/front/sales`"
-        class="flex items-center px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
-        active-class="bg-gray-100 text-gray-900 font-medium"
+        class="flex items-center px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100 transition-colors"
+        active-class="bg-gray-100 text-gray-900 font-semibold"
       >
         <Icon name="mdi:chart-line" class="w-5 h-5 mr-3" />
         Sales
       </NuxtLink>
       <NuxtLink
         :to="`/${businessType}/front/product`"
-        class="flex items-center px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
-        active-class="bg-gray-100 text-gray-900 font-medium"
+        class="flex items-center px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100 transition-colors"
+        active-class="bg-gray-100 text-gray-900 font-semibold"
       >
         <Icon name="mdi:package" class="w-5 h-5 mr-3" />
         Product
       </NuxtLink>
       <NuxtLink
         :to="`/${businessType}/front/transactions`"
-        class="flex items-center px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
-        active-class="bg-gray-100 text-gray-900 font-medium"
+        class="flex items-center px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100 transition-colors"
+        active-class="bg-gray-100 text-gray-900 font-semibold"
       >
         <Icon name="mdi:receipt" class="w-5 h-5 mr-3" />
         Transactions
       </NuxtLink>
       <NuxtLink
         :to="`/${businessType}/front/settings`"
-        class="flex items-center px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
-        active-class="bg-gray-100 text-gray-900 font-medium"
+        class="flex items-center px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100 transition-colors"
+        active-class="bg-gray-100 text-gray-900 font-semibold"
       >
         <Icon name="mdi:cog" class="w-5 h-5 mr-3" />
         Settings
@@ -109,7 +109,7 @@
     <div class="px-3 py-4 border-t border-gray-200">
       <button
         @click="handleLogout"
-        class="flex items-center w-full px-3 py-2 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
+        class="flex items-center w-full px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50 transition-colors"
       >
         <Icon name="mdi:logout" class="w-5 h-5 mr-3" />
         Log out
@@ -122,24 +122,32 @@
     <nav class="flex-1 px-3 py-4 space-y-1">
       <NuxtLink
         :to="`/${businessType}/kitchen`"
-        class="flex items-center px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
-        active-class="bg-gray-100 text-gray-900 font-medium"
+        class="flex items-center px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100 transition-colors"
+        active-class="bg-gray-100 text-gray-900 font-semibold"
       >
         <Icon name="mdi:clipboard-list" class="w-5 h-5 mr-3" />
         Orders
       </NuxtLink>
       <NuxtLink
         :to="`/${businessType}/kitchen/history`"
-        class="flex items-center px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
-        active-class="bg-gray-100 text-gray-900 font-medium"
+        class="flex items-center px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100 transition-colors"
+        active-class="bg-gray-100 text-gray-900 font-semibold"
       >
         <Icon name="mdi:clock" class="w-5 h-5 mr-3" />
         History
       </NuxtLink>
       <NuxtLink
+        :to="`/${businessType}/kitchen/products`"
+        class="flex items-center px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100 transition-colors"
+        active-class="bg-gray-100 text-gray-900 font-semibold"
+      >
+        <Icon name="mdi:shopping" class="w-5 h-5 mr-3" />
+        Product
+      </NuxtLink>
+      <NuxtLink
         :to="`/${businessType}/kitchen/printing-settings`"
-        class="flex items-center px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
-        active-class="bg-gray-100 text-gray-900 font-medium"
+        class="flex items-center px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100 transition-colors"
+        active-class="bg-gray-100 text-gray-900 font-semibold"
       >
         <Icon name="mdi:printer" class="w-5 h-5 mr-3" />
         Printing Settings
@@ -149,7 +157,7 @@
     <div class="px-3 py-4 border-t border-gray-200">
       <button
         @click="handleLogout"
-        class="flex items-center w-full px-3 py-2 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
+        class="flex items-center w-full px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50 transition-colors"
       >
         <Icon name="mdi:logout" class="w-5 h-5 mr-3" />
         Log out

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { UtensilsCrossed, Package } from '@lucide/vue'
+
 const props = defineProps<{ order: any; isNew?: boolean }>()
 defineEmits<{ markDone: [orderId: string] }>()
 
@@ -26,10 +28,30 @@ function timeAgo(d: string) {
       <span class="text-xs text-gray-400">{{ timeAgo(order.created_at) }}</span>
     </div>
 
+    <!-- Order type badge -->
+    <div v-if="order.order_type" class="mb-2">
+      <span
+        class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full"
+        :class="order.order_type === 'take-out' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'"
+      >
+        <Package v-if="order.order_type === 'take-out'" class="w-3 h-3" />
+        <UtensilsCrossed v-else class="w-3 h-3" />
+        {{ order.order_type === 'take-out' ? 'Take Out' : 'Dine In' }}
+      </span>
+    </div>
+
     <!-- Cashier -->
-    <p class="text-xs text-gray-500 mb-2">
+    <div class="text-xs text-gray-500 mb-2">
       cashier: {{ order.cashier || 'unknown' }}
-    </p>
+    </div>
+
+    <!-- Customer Request -->
+    <div v-if="order.notes_type" class="mb-3 bg-yellow-50 border border-yellow-200 rounded-lg p-2">
+      <div class="text-xs text-gray-500 font-medium">Customer Request:</div>
+      <div class="text-sm text-gray-700">
+        {{ order.notes_type }}
+      </div>
+    </div>
 
     <!-- Items list -->
     <div class="mb-3">
@@ -38,9 +60,6 @@ function timeAgo(d: string) {
           <span class="font-medium text-gray-800">{{ item.quantity }}</span>
           <span class="text-gray-800 font-medium truncate">{{ item.item_name }}</span>
         </div>
-        <p v-if="item.notes" class="text-xs text-gray-400 pl-5.5 truncate">
-          Notes: {{ item.notes }}
-        </p>
       </template>
     </div>
 

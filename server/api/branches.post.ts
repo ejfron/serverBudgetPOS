@@ -1,58 +1,77 @@
 import db from '../db/connection'
-import { v4 as uuidv4 } from 'uuid'
+import { randomUUID } from 'node:crypto'
 import bcrypt from 'bcrypt'
 import { hasKitchen, isValidBusinessType } from '../../shared/types/business.types'
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
-  const { branches } = body
+  const { branches, admin_branch_id } = body
 
   if (!Array.isArray(branches) || branches.length === 0) {
     throw createError({ statusCode: 400, statusMessage: 'At least one branch is required' })
   }
 
-  // Optional: check that the user is admin (we don't have auth in API yet, but it's okay for now)
-
-  const insertBranch = db.prepare('INSERT INTO branches (id, name, address, business_type) VALUES (?, ?, ?, ?)')
-  const insertUser = db.prepare(`
-    INSERT INTO users (id, username, password_hash, role, branch_id, full_name)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `)
-
-  const transaction = db.transaction(() => {
+  db.exec('BEGIN')
+  try {
     for (const b of branches) {
       if (!isValidBusinessType(b.business_type)) {
-        throw createError({ statusCode: 400, statusMessage: `Invalid or missing business_type for branch "${b.name || '(unnamed)'}"` })
+        throw new Error(`Invalid or missing business_type for branch "${b.name || '(unnamed)'}"`)
       }
 
       const branchNeedsKitchen = hasKitchen(b.business_type)
 
       if (!b.name || !b.cashierUsername || !b.cashierPassword) {
-        throw createError({ statusCode: 400, statusMessage: 'Branch name, cashier username, and cashier password are required' })
+        throw new Error('Branch name, cashier username, and cashier password are required')
       }
 
       if (branchNeedsKitchen && (!b.kitchenUsername || !b.kitchenPassword)) {
-        throw createError({ statusCode: 400, statusMessage: `Kitchen username and password are required for ${b.business_type} branches` })
+        throw new Error(`Kitchen username and password are required for ${b.business_type} branches`)
       }
 
-      const branchId = uuidv4()
-      insertBranch.run(branchId, b.name, b.location || '', b.business_type)
+      const branchId = randomUUID()
 
-      // Cashier (always created)
-      const cashierId = uuidv4()
+      db.prepare(`
+        INSERT INTO branches (id, name, address, business_type, created_by_branch)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(branchId, b.name, b.location || null, b.business_type, admin_branch_id || null)
+
+      // Cashier — always created
+      let cashierUsername = b.cashierUsername
+      let counter = 1
+      while (db.prepare('SELECT id FROM users WHERE username = ?').get(cashierUsername)) {
+        cashierUsername = `${b.cashierUsername}${counter}`
+        counter++
+      }
       const cashierHash = bcrypt.hashSync(b.cashierPassword, 10)
-      insertUser.run(cashierId, b.cashierUsername, cashierHash, 'front', branchId, b.cashierUsername)
+      db.prepare(`
+        INSERT INTO users (id, username, password_hash, role, branch_id, full_name)
+        VALUES (?, ?, ?, 'front', ?, ?)
+      `).run(randomUUID(), cashierUsername, cashierHash, branchId, b.name)
 
-      // Kitchen (only for types that have a kitchen side)
+    
       if (branchNeedsKitchen) {
-        const kitchenId = uuidv4()
+        let kitchenUsername = b.kitchenUsername
+        let kCounter = 1
+        while (db.prepare('SELECT id FROM users WHERE username = ?').get(kitchenUsername)) {
+          kitchenUsername = `${b.kitchenUsername}${kCounter}`
+          kCounter++
+        }
         const kitchenHash = bcrypt.hashSync(b.kitchenPassword, 10)
-        insertUser.run(kitchenId, b.kitchenUsername, kitchenHash, 'kitchen', branchId, b.kitchenUsername)
+        db.prepare(`
+          INSERT INTO users (id, username, password_hash, role, branch_id, full_name)
+          VALUES (?, ?, ?, 'kitchen', ?, ?)
+        `).run(randomUUID(), kitchenUsername, kitchenHash, branchId, b.name)
       }
     }
-  })
 
-  transaction()
-
-  return { success: true }
+    db.exec('COMMIT')
+    return { success: true }
+  } catch (err: any) {
+    db.exec('ROLLBACK')
+    console.error('Create branches error:', err)
+    throw createError({
+      statusCode: 500,
+      statusMessage: err.message || 'Failed to create branches',
+    })
+  }
 })

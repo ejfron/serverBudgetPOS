@@ -6,9 +6,9 @@ const { user } = useAuth()
 const branchHasKitchen = computed(() => hasKitchen(user.value?.business_type))
 
 import {
-  Printer, Wifi, LogOut, Clock, Loader2,
-  X, BluetoothSearching, CheckCircle2, RefreshCw, Send, Settings,
-  Receipt, ChefHat,
+  Printer, Wifi, LogOut, Loader2,
+  X, BluetoothSearching, CheckCircle2, RefreshCw, Send,
+  Store, User, ChevronDown,
 } from '@lucide/vue'
 
 const props = defineProps<{
@@ -22,7 +22,6 @@ const props = defineProps<{
 defineEmits<{
   logout: []
   connectPrinter: []
-  toggleSidebar: []
 }>()
 
 const {
@@ -38,9 +37,8 @@ const {
   testPrint,
 } = usePrinter()
 
-const currentTime = ref('')
-const currentDate = ref('')
 const showModal = ref(false)
+const showProfileDropdown = ref(false)
 const connecting = ref(false)
 const connectingId = ref<string | null>(null)
 const testing = ref(false)
@@ -49,22 +47,41 @@ const printerConnected = computed(() => props.printerConnected ?? printerConnect
 
 const displayBranchName = computed(() => props.branchName || user.value?.branch_name || 'Branch')
 const displayRole = computed(() => user.value?.role || props.role)
-const displayBusinessType = computed(() => {
-  const bt = user.value?.business_type || 'tapsilogan'
-  return bt.charAt(0).toUpperCase() + bt.slice(1)
+const displayName = computed(() => user.value?.full_name || user.value?.username || 'User')
+
+// Get initials from name
+const userInitials = computed(() => {
+  const name = displayName.value
+  const parts = name.split(' ')
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase()
+  }
+  return name.substring(0, 2).toUpperCase()
 })
 
-function updateTime() {
-  const now = new Date()
-  currentTime.value = now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })
-  currentDate.value = now.toLocaleDateString('en-PH', {
-    weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
-  })
+function getRoleBadge(role: string) {
+  const map: Record<string, { label: string; color: string; bg: string }> = {
+    admin: { label: 'Admin', color: 'text-purple-700', bg: 'bg-purple-100' },
+    front: { label: 'Cashier', color: 'text-orange-700', bg: 'bg-orange-100' },
+    kitchen: { label: 'Kitchen', color: 'text-blue-700', bg: 'bg-blue-100' },
+  }
+  return map[role] || map.front
+}
+
+// Close dropdown when clicking outside
+function handleClickOutside(event: MouseEvent) {
+  const target = event.target as HTMLElement
+  if (!target.closest('.profile-dropdown-container')) {
+    showProfileDropdown.value = false
+  }
 }
 
 onMounted(() => {
-  updateTime()
-  setInterval(updateTime, 1000)
+  document.addEventListener('click', handleClickOutside)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
 })
 
 async function openModal() {
@@ -101,84 +118,142 @@ function deviceIcon(device: any): string {
   if (name.includes('samsung') || name.includes('iphone') || name.includes('android')) return '📱'
   return '📡'
 }
+
+const badge = computed(() => getRoleBadge(displayRole.value))
 </script>
 
 <template>
-  <header class="bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between shrink-0 shadow-sm">
-
-    <div class="flex items-center gap-2.5">
-      <button @click="$emit('toggleSidebar')" class="lg:hidden p-1 rounded-lg text-gray-500 hover:bg-gray-100 mr-1">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
-        </svg>
-      </button>
-      <div
-        class="w-9 h-9 rounded-xl flex items-center justify-center shadow-md text-white"
-        :class="theme?.solidBg ?? 'bg-orange-500'"
-      >
-        <Receipt v-if="role === 'front'" class="w-5 h-5" />
-        <ChefHat v-else class="w-5 h-5" />
-      </div>
-      <div>
-        <p class="font-bold text-gray-800 text-sm leading-tight">
-          <span class="text-orange-500">{{ displayBusinessType }}</span> POS
-        </p>
-        <p class="text-xs text-gray-400">
-          {{ displayBranchName }} · <span class="capitalize font-medium text-gray-500">{{ displayRole }}</span>
-        </p>
-      </div>
-    </div>
-
-    <div class="hidden md:flex items-center gap-2">
-      <Clock class="w-4 h-4 text-gray-300" />
-      <div class="flex flex-col items-center">
-        <p class="text-base font-bold text-gray-800 leading-none">{{ currentTime }}</p>
-        <p class="text-xs text-gray-400 mt-0.5">{{ currentDate }}</p>
+  <header class="bg-white border-b border-gray-200 px-4 lg:px-6 py-2 flex items-center justify-between shrink-0 shadow-sm">
+    
+    <!-- Left: Logo & Brand -->
+    <div class="flex items-center gap-3">
+      <NuxtLink to="/" class="flex items-center shrink-0">
+        <img
+          src="/uploads/ChatGPT Image Jul 18, 2026 at 10_13_50 AM.png"
+          class="h-14 sm:h-15 md:h-16 w-auto object-contain"
+          alt="BudgetPOS"
+        />
+      </NuxtLink>
+      
+      <!-- Branch & Role Info -->
+      <div class="hidden md:flex items-center gap-3 pl-3 border-l border-gray-200">
+        <div class="flex items-center gap-1.5">
+          <Store class="w-4 h-4 text-gray-400" />
+          <span class="text-sm font-semibold text-gray-700">{{ displayBranchName }}</span>
+        </div>
+        <span
+          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold"
+          :class="[badge.bg, badge.color]"
+        >
+          {{ badge.label }}
+        </span>
       </div>
     </div>
 
+    <!-- Right: Actions -->
     <div class="flex items-center gap-2">
+      <!-- Printer Button (Front only) -->
       <button
         v-if="role === 'front'"
-        class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-all"
+        class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all border"
         :class="printerConnected
-          ? 'bg-green-50 text-green-600 border-green-200 hover:bg-green-100'
-          : 'bg-red-50 text-red-500 border-red-200 hover:bg-red-100'"
+          ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300'
+          : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100 hover:border-gray-300'"
         @click="openModal"
       >
         <Printer class="w-3.5 h-3.5" />
-        <span v-if="printerConnected" class="hidden sm:inline">
-          {{ connectedDevice?.name ?? 'Printer ready' }}
+        <span class="hidden sm:inline text-[11px]">
+          {{ printerConnected ? (connectedDevice?.name ?? 'Connected') : 'Printer' }}
         </span>
-        <span v-else class="hidden sm:inline">Connect printer</span>
+        <span
+          class="w-2 h-2 rounded-full shrink-0"
+          :class="printerConnected ? 'bg-emerald-500 animate-pulse' : 'bg-gray-300'"
+        />
       </button>
 
+      <!-- Kitchen Live Badge -->
       <div
         v-if="role === 'kitchen'"
-        class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-green-50 text-green-600 border border-green-200"
+        class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200"
       >
-        <Wifi class="w-3.5 h-3.5" />
+        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
         <span class="hidden sm:inline">Live</span>
       </div>
 
-      <NuxtLink
-        v-if="role === 'front'"
-        to="/front/settings"
-        class="flex items-center justify-center w-8 h-8 rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all"
-        title="Settings"
-      >
-        <Settings class="w-4 h-4" />
-      </NuxtLink>
+      <!-- Profile Dropdown -->
+      <div class="profile-dropdown-container relative">
+        <button
+          class="flex items-center gap-2 p-1.5 rounded-xl hover:bg-gray-100 transition-all group"
+          @click.stop="showProfileDropdown = !showProfileDropdown"
+        >
+          <!-- Avatar Circle -->
+          <div
+            class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+            :class="role === 'admin' ? 'bg-purple-500' : role === 'kitchen' ? 'bg-blue-500' : 'bg-orange-500'"
+          >
+            <span>{{ userInitials }}</span>
+          </div>
+          <div class="hidden sm:flex flex-col items-start leading-tight">
+            <span class="text-xs font-semibold text-gray-700">{{ displayName }}</span>
+            <span class="text-[10px] text-gray-400">{{ badge.label }}</span>
+          </div>
+          <ChevronDown
+            class="w-3.5 h-3.5 text-gray-400 transition-transform hidden sm:block"
+            :class="showProfileDropdown ? 'rotate-180' : ''"
+          />
+        </button>
 
-      <div class="w-px h-5 bg-gray-200" />
+        <!-- Dropdown Menu -->
+        <Transition
+          enter-active-class="transition duration-150 ease-out"
+          enter-from-class="opacity-0 scale-95 -translate-y-1"
+          enter-to-class="opacity-100 scale-100 translate-y-0"
+          leave-active-class="transition duration-100 ease-in"
+          leave-from-class="opacity-100 scale-100 translate-y-0"
+          leave-to-class="opacity-0 scale-95 -translate-y-1"
+        >
+          <div
+            v-if="showProfileDropdown"
+            class="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden z-50"
+          >
+            <!-- Profile Info -->
+            <div class="px-4 py-3 border-b border-gray-100">
+              <div class="flex items-center gap-3">
+                <div
+                  class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0"
+                  :class="role === 'admin' ? 'bg-purple-500' : role === 'kitchen' ? 'bg-blue-500' : 'bg-orange-500'"
+                >
+                  <span>{{ userInitials }}</span>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-semibold text-gray-800 truncate">{{ displayName }}</p>
+                  <p class="text-xs text-gray-400 truncate">{{ user?.username || '' }}</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 mt-2">
+                <span
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                  :class="[badge.bg, badge.color]"
+                >
+                  {{ badge.label }}
+                </span>
+                <span class="text-[10px] text-gray-400">{{ displayBranchName }}</span>
+              </div>
+            </div>
 
-      <button
-        class="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100 px-3 py-1.5 rounded-xl transition-all"
-        @click="$emit('logout')"
-      >
-        <LogOut class="w-3.5 h-3.5" />
-        <span class="hidden sm:inline">Log out</span>
-      </button>
+            <!-- Menu Items -->
+            <div class="py-1">
+              <button
+                class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors"
+                @click="showProfileDropdown = false; $emit('logout')"
+              >
+                <LogOut class="w-4 h-4" />
+                <span class="font-medium">Log out</span>
+              </button>
+            </div>
+          </div>
+        </Transition>
+      </div>
     </div>
   </header>
 

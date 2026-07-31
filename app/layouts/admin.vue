@@ -5,6 +5,7 @@ import { themeFor } from '~/utils/businessTheme'
 import { isValidBusinessType } from '@shared/types/business.types'
 import AppHeader from '~/components/shared/AppHeader.vue'
 import AppSidebar from '~/components/shared/AppSidebar.vue'
+import AppBottomNav from '~/components/shared/AppBottomNav.vue'
 
 const { logout, user } = useAuth()
 const { businessName, loadSettings } = useSettings()
@@ -27,6 +28,7 @@ function closeSidebar() {
 onMounted(() => loadSettings())
 </script>
 
+<!-- layouts/admin.vue -->
 <template>
   <div class="min-h-screen bg-gray-50 text-gray-800">
     <AppHeader
@@ -38,30 +40,27 @@ onMounted(() => loadSettings())
       @toggle-sidebar="toggleSidebar"
     />
 
-    <button
-      v-if="!sidebarOpen"
-      class="fixed left-3 top-20 z-40 flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 shadow-lg lg:hidden"
-      @click="toggleSidebar"
-      aria-label="Open menu"
-    >
-      <Menu class="h-5 w-5" />
-    </button>
-
+    <!-- Overlay for sidebar on mobile -->
     <div
       v-if="sidebarOpen"
       class="fixed inset-0 z-35 bg-black/30 lg:hidden"
       @click="closeSidebar"
     />
 
+    <!-- Sidebar - hidden on mobile -->
     <AppSidebar
       role="admin"
       :theme="theme"
-      class="fixed left-0 top-16 bottom-0 z-40 w-56 transition-transform duration-200 ease-in-out"
+      class="fixed left-0 top-20 bottom-0 z-40 w-56 transition-transform duration-200 ease-in-out hidden lg:block"
       :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'"
       @close="closeSidebar"
     />
 
-    <main class="mt-16 p-4 overflow-hidden lg:ml-56">
+    <!-- Add Bottom Navigation for mobile -->
+    <AppBottomNav role="admin" />
+
+    <!-- Adjust padding for bottom nav on mobile -->
+    <main class="mt-16 p-4 lg:ml-56 pb-20 lg:pb-4">
       <slot />
     </main>
   </div>

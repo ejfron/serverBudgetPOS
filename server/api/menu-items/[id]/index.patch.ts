@@ -1,31 +1,27 @@
 // @ts-nocheck
 import db from '../../../db/connection'
-import { randomUUID } from 'node:crypto'
-import { writeFile, mkdir } from 'node:fs/promises'
-import path from 'node:path'
 
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
-  const formData = await readFormData(event)
-  
-  const name = formData.get('name') as string
-  const category = formData.get('category') as string
-  const price = formData.get('price') as string
-  const image = formData.get('image') as File | null
+  const body = await readBody(event)
 
-  let imageUrl: string | null = null
-  if (image && image.size > 0) {
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads')
-    await mkdir(uploadDir, { recursive: true })
-    const ext = path.extname(image.name) || '.png'
-    const filename = `${randomUUID()}${ext}`
-    const buffer = Buffer.from(await image.arrayBuffer())
-    await writeFile(path.join(uploadDir, filename), buffer)
-    imageUrl = `/uploads/${filename}`
-    db.prepare('UPDATE menu_items SET name = ?, category = ?, price = ?, image_url = ? WHERE id = ?').run(name, category, Number(price), imageUrl, id)
-  } else {
-    db.prepare('UPDATE menu_items SET name = ?, category = ?, price = ? WHERE id = ?').run(name, category, Number(price), id)
+  if (body.is_available !== undefined || body.stock_status !== undefined) {
+    // Add column if missing
+    db.exec('ALTER TABLE menu_items ADD COLUMN stock_status TEXT DEFAULT "available"')
+
+    const isAvail = body.is_available === true || body.is_available === 1 ? 1 : 0
+    const stock = body.stock_status || 'available'
+
+    db.prepare('UPDATE menu_items SET is_available = ?, stock_status = ? WHERE id = ?').run(isAvail, stock, id)
+    return { success: true }
   }
 
-  return { success: true }
+  if (body.name) {
+    db.prepare('UPDATE menu_items SET name = ?, category = ?, price = ? WHERE id = ?').run(
+      body.name, body.category, Number(body.price), id
+    )
+    return { success: true }
+  }
+
+  throw createError({ statusCode: 400, statusMessage: 'Invalid request' })
 })

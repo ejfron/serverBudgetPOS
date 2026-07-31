@@ -4,14 +4,16 @@ const config: CapacitorConfig = {
   appId: 'com.tapsilogan.pos',
   appName: 'Tapsilogan POS',
   webDir: '.output/public',
+
   server: {
-    url: 'https://tapsilogan-pos.onrender.com',
-    cleartext: false,
-    androidScheme: 'https'
+    androidScheme: 'https',
   },
-  android: { 
-    allowMixedContent: true 
+  android: {
+    allowMixedContent: true,
   },
 }
 
 export default config
+
+// update server and store local data of the user in the device sales, transaction, all data
+// update printer format with update dine in or take out

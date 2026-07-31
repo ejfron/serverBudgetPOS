@@ -5,16 +5,18 @@ import { writeFile, mkdir } from 'node:fs/promises'
 import path from 'node:path'
 
 export default defineEventHandler(async (event) => {
-  // Read as FormData for image upload support
   const formData = await readFormData(event)
-  
   const name = formData.get('name') as string
   const category = formData.get('category') as string
   const price = formData.get('price') as string
+  const branchId = formData.get('branch_id') as string | null
   const image = formData.get('image') as File | null
 
   if (!name || !price) {
     throw createError({ statusCode: 400, statusMessage: 'Name and price required' })
+  }
+  if (!branchId) {
+    throw createError({ statusCode: 400, statusMessage: 'branch_id required' })
   }
 
   let imageUrl: string | null = null
@@ -29,11 +31,11 @@ export default defineEventHandler(async (event) => {
   }
 
   const id = randomUUID()
-  db.prepare('INSERT INTO menu_items (id, name, category, price, image_url, is_available) VALUES (?, ?, ?, ?, ?, 1)')
-    .run(id, name, category || 'silog', Number(price), imageUrl)
+  db.prepare('INSERT INTO menu_items (id, name, category, price, image_url, is_available, branch_id,, wholesale_price) VALUES (?, ?, ?, ?, ?, 1, ?, ?)')
+    .run(id, name, category || 'silog', Number(price), imageUrl, branchId, wholesalePriceValue)
 
-  return { 
-    success: true, 
-    data: { id, name, category: category || 'silog', price: Number(price), image_url: imageUrl } 
+  return {
+    success: true,
+    data: { id, name, category: category || 'silog', price: Number(price), image_url: imageUrl, branch_id: branchId, wholesale_price: wholesalePriceValue}
   }
 })

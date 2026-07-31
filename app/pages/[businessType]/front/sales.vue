@@ -4,9 +4,11 @@ definePageMeta({ layout: 'front' })
 import { RefreshCw, NotepadText, Banknote, CreditCard, Calendar, Filter, ShoppingBag } from '@lucide/vue'
 import { useAuth } from '~/composables/useAuth'
 import { useServerConfig } from '~/composables/useServerConfig'
+import { usePosData } from '~/composables/usePosData'
 
 const { user } = useAuth()
 const { serverUrl } = useServerConfig()
+const { isLocal, getSalesStats, getOrdersLocal } = usePosData()
 
 const stats = ref({ totalRevenue: 0, orderCount: 0, averageOrder: 0 })
 const recentOrders = ref<any[]>([])
@@ -16,15 +18,22 @@ const selectedPayment = ref<'all' | 'cash' | 'gcash'>('all')
 const selectedDate = ref<string>('')
 
 async function loadStats() {
-  if (!user.value?.branch_id) return
   loading.value = true
   try {
-    // Only load completed orders for sales
+    if (isLocal.value) {
+      stats.value = await getSalesStats()
+      const orders = await getOrdersLocal('completed')
+      recentOrders.value = orders.filter((o: any) => o.status === 'completed' && o.status !== 'voided')
+      return
+    }
+
+    if (!user.value?.branch_id) return
+
     const [statsRes, ordersRes] = await Promise.all([
       $fetch<any>(`${serverUrl.value}/api/sales/stats?branch_id=${user.value.branch_id}`),
       $fetch<any>(`${serverUrl.value}/api/orders?branch_id=${user.value.branch_id}&status=completed`),
     ])
- 
+
     stats.value = statsRes ?? { totalRevenue: 0, orderCount: 0, averageOrder: 0 }
     recentOrders.value = (ordersRes?.data ?? []).filter(
       (o: any) => o.status === 'completed' && o.status !== 'voided'
@@ -106,7 +115,7 @@ function clearDateFilter() {
 watch(
   () => user.value?.branch_id,
   (branchId) => {
-    if (branchId) loadStats()
+    if (branchId || isLocal.value) loadStats()
   },
   { immediate: true },
 )
@@ -149,7 +158,7 @@ watch(
         <input
           type="date"
           v-model="selectedDate"
-          class="px-2 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold border border-gray-200 bg-white text-gray-600 focus:outline-none focus:border-orange-400 transition w-[130px] sm:w-auto"
+          class="px-2 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold border border-gray-200 bg-white text-gray-600 focus:outline-none focus:border-orange-400 transition w-32.5 sm:w-auto"
           @change="selectedFilter = '' as any"
         />
         <button
@@ -265,7 +274,7 @@ watch(
               </div>
               <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                  <p class="text-xs sm:text-sm font-semibold text-gray-800 truncate max-w-[120px] sm:max-w-48">
+                  <p class="text-xs sm:text-sm font-semibold text-gray-800 truncate max-w-30 sm:max-w-48">
                     {{ order.order_items?.map((i: any) => `${i.item_name} x${i.quantity}`).join(', ') || '—' }}
                   </p>
                   <span 

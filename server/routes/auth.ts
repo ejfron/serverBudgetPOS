@@ -31,6 +31,27 @@ router.post('/login', (req, res) => {
       full_name: user.full_name,
     },
   })
+
+
+const branchHasKitchen = db.prepare(`
+  SELECT COUNT(*) as count FROM users WHERE branch_id = ? AND role = 'kitchen'
+`).get(user.branch_id) as { count: number }
+
+const storageMode = branchHasKitchen.count > 0 ? 'server' : 'local'
+
+return res.json({
+  success: true,
+  user: {
+    id: user.id,
+    username: user.username,
+    role: user.role,
+    branch_id: user.branch_id,
+    branch_name: user.branch_name,
+    business_type: user.business_type,
+    storage_mode: storageMode,
+    full_name: user.full_name,
+  },
+})
 })
 
 router.post('/verify-admin', (req, res) => {
